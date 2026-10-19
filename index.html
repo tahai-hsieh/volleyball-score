@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>排球轉播計分系統</title>
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Arial', 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+    touch-action: manipulation;
+  }
+
+  body {
+    background-color: transparent;
+    overflow-x: hidden;
+    padding: 10px;
+    color: #ffffff;
+  }
+
+  body.view-vb-live #summary-section,
+  body.view-vb-live #control-section {
+    display: none !important;
+  }
+
+  body.view-vb-summary #live-section,
+  body.view-vb-summary #control-section {
+    display: none !important;
+  }
+
+  body.view-vb-control {
+    background-color: #0f131a;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .preview-label {
+    display: none;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+
+  body.view-vb-control .preview-label {
+    display: block;
+  }
+
+  .scale-outer {
+    width: 100%;
+    max-width: 1100px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body.view-vb-control #live-section,
+  body.view-vb-control #summary-section {
+    margin-bottom: 26px;
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  .scale-inner {
+    width: 1080px;
+    transform-origin: top left;
+  }
+
+  /* =========================================================
+     1. 場上即時轉播計分板 (?view=vb_live)
+     ========================================================= */
+  .live-scorebug-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 1080px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    user-select: none;
+  }
+
+  .live-scorebug {
+    display: flex;
+    align-items: stretch;
+    height: 92px;
+    background: #11161f;
+    width: 100%;
+  }
+
+  .live-team {
+    display: flex;
+    align-items: stretch;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .live-team.away {
+    flex-direction: row-reverse;
+  }
+
+  .live-team-banner {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    gap: 14px;
+  }
+
+  .live-team.home .live-team-banner {
+    flex-direction: row;
+  }
+
+  .live-team.away .live-team-banner {
+    flex-direction: row-reverse;
+  }
+
+  .live-logo {
+    width: 70px;
+    height: 70px;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    object-position: center;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.65));
+    flex-shrink: 0;
+  }
+
+  .live-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .live-name {
+    font-size: 38px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-shadow: 0 3px 6px rgba(0,0,0,0.75);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    width: 100%;
+    line-height: 1.15;
+  }
+
+  /* 勝局數方塊 (Sets Won) */
+  .live-sets-box {
+    width: 76px;
+    height: 92px;
+    background: #18202c;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid rgba(255,255,255,0.12);
+    border-right: 1px solid rgba(255,255,255,0.12);
+    flex-shrink: 0;
+  }
+
+  .sets-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+
+  .sets-val {
+    font-size: 38px;
+    font-weight: 900;
+    color: #facc15;
+    line-height: 1;
+  }
+
+  /* 當局得分框 */
+  .live-score-box {
+    width: 118px;
+    height: 92px;
+    background: #090c12;
+    position: relative;
+    overflow: hidden;
+    border-left: 1px solid rgba(255,255,255,0.12);
+    border-right: 1px solid rgba(255,255,255,0.12);
+    flex-shrink: 0;
+  }
+
+  .score-track {
+    width: 100%;
+    height: 276px;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(0);
+  }
+
+  .score-slot {
+    width: 118px;
+    height: 92px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 50px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .score-slot.plus-badge {
+    color: #38bdf8;
+    font-size: 42px;
+    background: #090c12;
+  }
+
+  @keyframes slideScoreSequence {
+    0%   { transform: translateY(0); }
+    18%  { transform: translateY(-92px); }
+    72%  { transform: translateY(-92px); }
+    92%  { transform: translateY(-184px); }
+    100% { transform: translateY(-184px); }
+  }
+
+  .animating-slide {
+    animation: slideScoreSequence 1.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  /* 中央局數與暫停數方塊 */
+  .live-center-period {
+    width: 130px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #141923;
+    flex-shrink: 0;
+    border-left: 1px solid rgba(255,255,255,0.12);
+    border-right: 1px solid rgba(255,255,255,0.12);
+  }
+
+  .center-set-title {
+    font-size: 13px;
+    font-weight: 900;
+    color: #facc15;
+    letter-spacing: 1.5px;
+  }
+
+  .center-to-nums {
+    font-size: 18px;
+    font-weight: 900;
+    color: #94a3b8;
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+
+  /* 最下方獨立橫列：左聯賽名稱 + 右發球權提示 */
+  .live-bottom-bar {
+    background: #090d14;
+    color: #ffffff;
+    min-height: 44px;
+    padding: 6px 20px;
+    border-top: 2px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .live-title-text {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    color: #f8fafc;
+    white-space: pre;
+  }
+
+  .serve-indicator {
+    font-size: 14px;
+    font-weight: bold;
+    color: #facc15;
+    background: rgba(250, 204, 21, 0.15);
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(250, 204, 21, 0.4);
+  }
+
+  /* =========================================================
+     2. 各局總計分板 (?view=vb_summary)
+     ========================================================= */
+  .scoreboard {
+    width: 1080px;
+    background: linear-gradient(180deg, #161c24 0%, #090c10 100%);
+    color: #ffffff;
+    border-bottom: 3px solid #2a3546;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+    user-select: none;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 390px 102px 102px 102px 102px 102px 180px;
+    align-items: center;
+  }
+
+  .header-row {
+    min-height: 54px;
+    padding: 6px 0;
+    background: #0c1017;
+    font-weight: 900;
+    font-size: 21px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #262f3d;
+  }
+
+  .league-title-wrap {
+    width: 390px;
+    padding-left: 18px;
+    padding-right: 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+  }
+
+  .league-title {
+    font-style: italic;
+    font-size: 23px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 1px;
+    line-height: 1.25;
+    white-space: pre;
+  }
+
+  .col-q { text-align: center; color: #e0e6ed; }
+  .col-q sup { font-size: 13px; }
+  .col-total-header {
+    text-align: center;
+    color: #facc15;
+    font-size: 23px;
+    letter-spacing: 2px;
+  }
+
+  .team-row {
+    height: 68px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .team-banner {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 28px 0 16px;
+    clip-path: polygon(0 0, 100% 0, 93% 100%, 0% 100%);
+    gap: 12px;
+  }
+
+  .team-logo {
+    height: 54px;
+    width: 54px;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    object-position: center;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.55));
+    flex-shrink: 0;
+  }
+
+  .team-name {
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-shadow: 1px 2px 5px rgba(0, 0, 0, 0.65);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    text-align: center;
+  }
+
+  .score-q {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 800;
+    color: #b0b8c4;
+  }
+
+  .score-q.current-set {
+    color: #ffffff;
+    font-weight: 900;
+  }
+
+  .score-total {
+    text-align: center;
+    font-size: 40px;
+    font-weight: 900;
+    color: #facc15;
+    background: rgba(250, 204, 21, 0.08);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* =========================================================
+     3. 控制台 (?mode=vb_control)
+     ========================================================= */
+  #control-section {
+    width: 100%;
+    max-width: 1080px;
+    background: #181d26;
+    border: 1px solid #2a3140;
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .ctrl-top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #2a3140;
+  }
+
+  .period-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .period-btn {
+    background: #283040;
+    color: #cbd5e1;
+    border: 1px solid #3b465c;
+    border-radius: 6px;
+    padding: 7px 13px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .period-btn.active {
+    background: #eab308;
+    color: #000000;
+    border-color: #facc15;
+  }
+
+  .serve-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .teams-ctrl-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 768px) {
+    .teams-ctrl-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .team-ctrl-card {
+    background: #1f2633;
+    border: 1px solid #313b4e;
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .ctrl-row {
+    margin-bottom: 12px;
+  }
+
+  .ctrl-row label {
+    display: block;
+    font-size: 12.5px;
+    color: #94a3b8;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+
+  .input-with-color {
+    display: flex;
+    gap: 8px;
+  }
+
+  .team-name-input {
+    flex: 1;
+    background: #0f131a;
+    border: 1px solid #3b465c;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: bold;
+    resize: vertical;
+  }
+
+  .color-picker-input {
+    width: 40px;
+    height: 38px;
+    border: 1px solid #3b465c;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .logo-upload-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctrl-btn {
+    background: #333d52;
+    color: #ffffff;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .ctrl-btn:hover {
+    background: #404c66;
+  }
+
+  .ctrl-btn.active-serve {
+    background: #eab308;
+    color: #000000;
+    border-color: #facc15;
+  }
+
+  .score-btn-group {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 8px;
+  }
+
+  .sets-btn-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.5fr;
+    gap: 8px;
+  }
+
+  .score-btn {
+    padding: 14px 0;
+    border: none;
+    border-radius: 6px;
+    font-size: 17px;
+    font-weight: 900;
+    color: #ffffff;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  .score-btn:active {
+    transform: scale(0.95);
+  }
+
+  .btn-p1 { background: #0284c7; }
+  .btn-m1 { background: #dc2626; }
+  .btn-set-add { background: #ca8a04; }
+  .btn-set-sub { background: #475569; }
+  .btn-set-win { background: #16a34a; font-size: 14px; }
+</style>
+</head>
+<body>
+
+  <!-- 1. 場上即時計分板 (?view=vb_live) -->
+  <div id="live-section">
+    <div class="preview-label">▼ 預覽 1：排球場上即時計分板（OBS 連結參數：?view=vb_live）</div>
+    <div class="scale-outer" id="scale-outer-live">
+      <div class="scale-inner" id="scale-inner-live">
+        <div class="live-scorebug-wrapper">
+          <div class="live-scorebug">
+            <!-- 左隊 -->
+            <div class="live-team home">
+              <div class="live-team-banner" id="live-t1-bg" style="background: #15803d;">
+                <img id="live-t1-logo" class="live-logo" src="" alt="" style="display:none;">
+                <div class="live-info">
+                  <div class="live-name" id="live-t1-name">臺中連莊</div>
+                </div>
+              </div>
+              <div class="live-sets-box">
+                <div class="sets-label">SETS</div>
+                <div class="sets-val" id="live-t1-sets">2</div>
+              </div>
+              <div class="live-score-box" id="box-t1">
+                <div class="score-track" id="track-t1">
+                  <div class="score-slot" id="slot-t1-cur">24</div>
+                  <div class="score-slot plus-badge" id="slot-t1-plus">+1</div>
+                  <div class="score-slot" id="slot-t1-next">24</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 中央局數與暫停數 -->
+            <div class="live-center-period">
+              <div class="center-set-title" id="live-set-title">SET 3</div>
+              <div class="center-to-nums" id="live-to-display">0 - 0</div>
+            </div>
+
+            <!-- 右隊 -->
+            <div class="live-team away">
+              <div class="live-team-banner" id="live-t2-bg" style="background: #1e40af;">
+                <img id="live-t2-logo" class="live-logo" src="" alt="" style="display:none;">
+                <div class="live-info">
+                  <div class="live-name" id="live-t2-name">台鋼天鷹</div>
+                </div>
+              </div>
+              <div class="live-sets-box">
+                <div class="sets-label">SETS</div>
+                <div class="sets-val" id="live-t2-sets">1</div>
+              </div>
+              <div class="live-score-box" id="box-t2">
+                <div class="score-track" id="track-t2">
+                  <div class="score-slot" id="slot-t2-cur">26</div>
+                  <div class="score-slot plus-badge" id="slot-t2-plus">+1</div>
+                  <div class="score-slot" id="slot-t2-next">26</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 下排：聯賽名稱 + 發球權標示 -->
+          <div class="live-bottom-bar">
+            <div class="live-title-text" id="live-title-display">台灣職業排球聯賽 例行賽</div>
+            <div class="serve-indicator" id="live-serve-indicator">🏐 發球權：無</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 各局總計分板 (?view=vb_summary) -->
+  <div id="summary-section">
+    <div class="preview-label">▼ 預覽 2：排球各局總計分板（OBS 連結參數：?view=vb_summary）</div>
+    <div class="scale-outer" id="scale-outer-summary">
+      <div class="scale-inner" id="scale-inner-summary">
+        <div class="scoreboard">
+          <div class="row header-row">
+            <div class="league-title-wrap" id="sum-title-wrap">
+              <div class="league-title" id="sum-league-title">台灣職業排球聯賽 例行賽</div>
+            </div>
+            <div class="col-q">1<sup>st</sup></div>
+            <div class="col-q">2<sup>nd</sup></div>
+            <div class="col-q">3<sup>rd</sup></div>
+            <div class="col-q">4<sup>th</sup></div>
+            <div class="col-q">5<sup>th</sup></div>
+            <div class="col-total-header">SETS</div>
+          </div>
+
+          <div class="row team-row">
+            <div class="team-banner" id="sum-t1-bg" style="background: #15803d;">
+              <img id="sum-t1-logo" class="team-logo" src="" alt="" style="display:none;">
+              <div class="team-name" id="sum-t1-name">臺中連莊</div>
+            </div>
+            <div class="score-q" id="sum-t1-s1">25</div>
+            <div class="score-q" id="sum-t1-s2">25</div>
+            <div class="score-q" id="sum-t1-s3">24</div>
+            <div class="score-q" id="sum-t1-s4"></div>
+            <div class="score-q" id="sum-t1-s5"></div>
+            <div class="score-total" id="sum-t1-sets">2</div>
+          </div>
+
+          <div class="row team-row">
+            <div class="team-banner" id="sum-t2-bg" style="background: #1e40af;">
+              <img id="sum-t2-logo" class="team-logo" src="" alt="" style="display:none;">
+              <div class="team-name" id="sum-t2-name">台鋼天鷹</div>
+            </div>
+            <div class="score-q" id="sum-t2-s1">21</div>
+            <div class="score-q" id="sum-t2-s2">17</div>
+            <div class="score-q" id="sum-t2-s3">26</div>
+            <div class="score-q" id="sum-t2-s4"></div>
+            <div class="score-q" id="sum-t2-s5"></div>
+            <div class="score-total" id="sum-t2-sets">1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 控制台 (?mode=vb_control) -->
+  <div id="control-section">
+    <div class="ctrl-top-bar">
+      <div class="ctrl-row" style="margin-bottom:0; flex:1; min-width:220px;">
+        <label>比賽名稱 (按 Enter 可手動換行)</label>
+        <textarea class="team-name-input" id="in-game-title" rows="2" oninput="updateGameTitle()">台灣職業排球聯賽 例行賽</textarea>
+      </div>
+
+      <div class="period-selector">
+        <span style="font-weight:bold; color:#cbd5e1; margin-right:4px;">目前局數：</span>
+        <button class="period-btn" id="pbtn-1" onclick="changeSet(1)">1st</button>
+        <button class="period-btn" id="pbtn-2" onclick="changeSet(2)">2nd</button>
+        <button class="period-btn" id="pbtn-3" onclick="changeSet(3)">3rd</button>
+        <button class="period-btn" id="pbtn-4" onclick="changeSet(4)">4th</button>
+        <button class="period-btn" id="pbtn-5" onclick="changeSet(5)">5th</button>
+      </div>
+
+      <div class="serve-selector">
+        <span style="font-weight:bold; color:#cbd5e1; margin-right:4px;">發球權：</span>
+        <button class="ctrl-btn" id="sbtn-t1" onclick="setServe('t1')">🏐 左隊</button>
+        <button class="ctrl-btn" id="sbtn-none" onclick="setServe('none')">無</button>
+        <button class="ctrl-btn" id="sbtn-t2" onclick="setServe('t2')">🏐 右隊</button>
+      </div>
+
+      <button class="ctrl-btn" style="background:#7f1d1d; border-color:#991b1b;" onclick="resetAllScores()">🔄 歸零重設</button>
+    </div>
+
+    <div class="teams-ctrl-grid">
+      <!-- 左隊控制 -->
+      <div class="team-ctrl-card">
+        <div class="ctrl-row">
+          <label>左隊名稱 & 代表色</label>
+          <div class="input-with-color">
+            <input type="text" class="team-name-input" id="in-t1-name" value="臺中連莊" oninput="updateTeamMeta('t1')">
+            <input type="color" class="color-picker-input" id="in-t1-color" value="#15803d" oninput="updateTeamMeta('t1')">
+          </div>
+        </div>
+
+        <div class="ctrl-row">
+          <label>球隊 Logo</label>
+          <div class="logo-upload-row">
+            <button class="ctrl-btn" onclick="document.getElementById('file-t1').click()">📁 選擇圖片上傳</button>
+            <button class="ctrl-btn" id="del-logo-t1" style="display:none;" onclick="removeLogo('t1')">✕ 移除</button>
+            <input type="file" id="file-t1" accept="image/*" style="display:none;" onchange="uploadLogo('t1', this)">
+          </div>
+        </div>
+
+        <div class="ctrl-row">
+          <label>當局得分控制 (+1 自動滑動並切換發球權)</label>
+          <div class="score-btn-group">
+            <button class="score-btn btn-p1" onclick="addScore('t1', 1)">+1 得分</button>
+            <button class="score-btn btn-m1" onclick="addScore('t1', -1)">-1 扣分</button>
+          </div>
+        </div>
+
+        <div class="ctrl-row">
+          <label>勝局數控制 (SETS)</label>
+          <div class="sets-btn-group">
+            <button class="score-btn btn-set-add" onclick="changeSetsWon('t1', 1)">勝局 +1</button>
+            <button class="score-btn btn-set-sub" onclick="changeSetsWon('t1', -1)">勝局 -1</button>
+            <button class="score-btn btn-set-win" onclick="winCurrentSet('t1')">🏆 拿下本局</button>
+          </div>
+        </div>
+
+        <div class="ctrl-row" style="margin-bottom:0;">
+          <label>本局暫停次數 (T.O.)</label>
+          <div style="display:flex; gap:8px;">
+            <button class="ctrl-btn" style="flex:1;" onclick="changeTimeouts('t1', -1)">− 暫停</button>
+            <button class="ctrl-btn" style="flex:1;" onclick="changeTimeouts('t1', 1)">+ 暫停 (<span id="t1-to-cnt">0</span>)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右隊控制 -->
+      <div class="team-ctrl-card">
+        <div class="ctrl-row">
+          <label>右隊名稱 & 代表色</label>
+          <div class="input-with-color">
+            <input type="text" class="team-name-input" id="in-t2-name" value="台鋼天鷹" oninput="updateTeamMeta('t2')">
+            <input type="color" class="color-picker-input" id="in-t2-color" value="#1e40af" oninput="updateTeamMeta('t2')">
+          </div>
+        </div>
+
+        <div class="ctrl-row">
+          <label>球隊 Logo</label>
+          <div class="logo-upload-row">
+            <button class="ctrl-btn" onclick="document.getElementById('file-t2').click()">📁 選擇圖片上傳</button>
+            <button class="ctrl-btn" id="del-logo-t2" style="display:none;" onclick="removeLogo('t2')">✕ 移除</button>
+            <input type="file" id="file-t2" accept="image/*" style="display:none;" onchange="uploadLogo('t2', this)">
+          </div>
+        </div>
+
+        <div class="ctrl-row">
+          <label>當局得分控制 (+1 自動滑動並切換發球權)</label>
+          <div class="score-btn-group">
+            <button class="score-btn btn-p1" onclick="addScore('t2', 1)">+1 得分</button>
+            <button class="score-btn btn-m1" onclick="addScore('t2', -1)">-1 扣分</button>
+          </div>
+        </div>
+
+        <div class="ctrl-row">
+          <label>勝局數控制 (SETS)</label>
+          <div class="sets-btn-group">
+            <button class="score-btn btn-set-add" onclick="changeSetsWon('t2', 1)">勝局 +1</button>
+            <button class="score-btn btn-set-sub" onclick="changeSetsWon('t2', -1)">勝局 -1</button>
+            <button class="score-btn btn-set-win" onclick="winCurrentSet('t2')">🏆 拿下本局</button>
+          </div>
+        </div>
+
+        <div class="ctrl-row" style="margin-bottom:0;">
+          <label>本局暫停次數 (T.O.)</label>
+          <div style="display:flex; gap:8px;">
+            <button class="ctrl-btn" style="flex:1;" onclick="changeTimeouts('t2', -1)">− 暫停</button>
+            <button class="ctrl-btn" style="flex:1;" onclick="changeTimeouts('t2', 1)">+ 暫停 (<span id="t2-to-cnt">0</span>)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+      if (e.cancelable) e.preventDefault();
+      if (e.target && typeof e.target.click === 'function') {
+        e.target.click();
+      }
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  document.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  const firebaseConfig = {
+    databaseURL: "https://score-record-0000-default-rtdb.asia-southeast1.firebasedatabase.app/"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const stateRef = db.ref('vb_scoreboard/state');
+  const logsRef = db.ref('vb_scoreboard/logs');
+
+  const params = new URLSearchParams(window.location.search);
+  const viewParam = params.get('view');
+  if (viewParam === 'vb_live') {
+    document.body.classList.add('view-vb-live');
+  } else if (viewParam === 'vb_summary') {
+    document.body.classList.add('view-vb-summary');
+  } else {
+    document.body.classList.add('view-vb-control');
+  }
+
+  const channel = new BroadcastChannel('vb_clean_sync_v2');
+
+  const defaultState = {
+    gameTitle: '台灣職業排球聯賽 例行賽',
+    currentSet: 3,
+    serve: 'none',
+    t1: { name: '臺中連莊', color: '#15803d', logo: '', timeouts: 0, setsWon: 2, s1: 25, s2: 25, s3: 24, s4: null, s5: null },
+    t2: { name: '台鋼天鷹', color: '#1e40af', logo: '', timeouts: 0, setsWon: 1, s1: 21, s2: 17, s3: 26, s4: null, s5: null }
+  };
+
+  let state = loadState();
+  let animTimers = { t1: null, t2: null };
+  let lastActionId = 0;
+
+  function loadState() {
+    try {
+      const saved = localStorage.getItem('vb_clean_state_v2');
+      return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultState));
+    } catch (e) {
+      return JSON.parse(JSON.stringify(defaultState));
+    }
+  }
+
+  function saveState(broadcast = true, actionMeta = null) {
+    const actionId = Date.now() + Math.random();
+    lastActionId = actionId;
+    state.updatedAt = new Date().toISOString();
+    state.lastAction = actionMeta ? { ...actionMeta, actionId } : { type: 'sync', actionId };
+
+    localStorage.setItem('vb_clean_state_v2', JSON.stringify(state));
+    if (broadcast) {
+      channel.postMessage({ type: 'sync', state });
+    }
+
+    stateRef.set(state).catch((err) => {
+      console.error('Firebase 寫入失敗：', err);
+    });
+  }
+
+  function pushFirebaseLog(actionDesc, extraData = {}) {
+    const sKey = `s${state.currentSet}`;
+    logsRef.push({
+      timestamp: new Date().toISOString(),
+      currentSet: state.currentSet,
+      action: actionDesc,
+      gameTitle: state.gameTitle,
+      t1_name: state.t1.name,
+      t1_sets: state.t1.setsWon,
+      t1_score: state.t1[sKey] || 0,
+      t2_name: state.t2.name,
+      t2_sets: state.t2.setsWon,
+      t2_score: state.t2[sKey] || 0,
+      ...extraData
+    }).catch((err) => {
+      console.error('Firebase 紀錄寫入失敗：', err);
+    });
+  }
+
+  function getSetScore(teamObj, setNum = state.currentSet) {
+    const val = teamObj[`s${setNum}`];
+    return (val === null || val === '' || val === undefined) ? 0 : Number(val);
+  }
+
+  function getSetLabel(s) {
+    return s === 1 ? 'SET 1' : s === 2 ? 'SET 2' : s === 3 ? 'SET 3' : s === 4 ? 'SET 4' : 'SET 5';
+  }
+
+  function adjustResponsiveScale() {
+    const pairs = [
+      { outer: document.getElementById('scale-outer-live'), inner: document.getElementById('scale-inner-live') },
+      { outer: document.getElementById('scale-outer-summary'), inner: document.getElementById('scale-inner-summary') }
+    ];
+
+    pairs.forEach(({ outer, inner }) => {
+      if (!outer || !inner || outer.offsetParent === null) return;
+      const availWidth = outer.clientWidth || (window.innerWidth - 20);
+      const baseWidth = 1080;
+      const scale = Math.min(1, availWidth / baseWidth);
+      inner.style.transform = `scale(${scale})`;
+      outer.style.height = `${Math.ceil(inner.offsetHeight * scale)}px`;
+    });
+  }
+
+  window.addEventListener('resize', adjustResponsiveScale);
+  window.addEventListener('orientationchange', () => setTimeout(adjustResponsiveScale, 150));
+
+  function renderUI(skipTeamKey = null) {
+    const titleText = state.gameTitle !== undefined ? state.gameTitle : '台灣職業排球聯賽 例行賽';
+    document.getElementById('live-title-display').textContent = titleText;
+
+    const sumTitle = document.getElementById('sum-league-title');
+    if (sumTitle) sumTitle.textContent = titleText;
+
+    const gameTitleInput = document.getElementById('in-game-title');
+    if (gameTitleInput && document.activeElement !== gameTitleInput) {
+      gameTitleInput.value = titleText;
+    }
+
+    document.getElementById('live-set-title').textContent = getSetLabel(state.currentSet);
+    document.getElementById('live-to-display').textContent = `${state.t1.timeouts || 0} - ${state.t2.timeouts || 0}`;
+
+    for (let s = 1; s <= 5; s++) {
+      const btn = document.getElementById(`pbtn-${s}`);
+      if (btn) btn.classList.toggle('active', state.currentSet === s);
+    }
+
+    const serveText = state.serve === 't1' ? `🏐 發球權：${state.t1.name}` : state.serve === 't2' ? `🏐 發球權：${state.t2.name}` : '🏐 發球權：無';
+    document.getElementById('live-serve-indicator').textContent = serveText;
+
+    const sbtnT1 = document.getElementById('sbtn-t1');
+    const sbtnNone = document.getElementById('sbtn-none');
+    const sbtnT2 = document.getElementById('sbtn-t2');
+    if (sbtnT1) sbtnT1.classList.toggle('active-serve', state.serve === 't1');
+    if (sbtnNone) sbtnNone.classList.toggle('active-serve', state.serve === 'none');
+    if (sbtnT2) sbtnT2.classList.toggle('active-serve', state.serve === 't2');
+
+    ['t1', 't2'].forEach(k => {
+      const t = state[k];
+      const curSetScore = getSetScore(t, state.currentSet);
+
+      document.getElementById(`live-${k}-name`).textContent = t.name;
+      document.getElementById(`live-${k}-bg`).style.background = t.color;
+      document.getElementById(`live-${k}-sets`).textContent = t.setsWon || 0;
+      document.getElementById(`${k}-to-cnt`).textContent = t.timeouts || 0;
+
+      const liveLogo = document.getElementById(`live-${k}-logo`);
+      if (t.logo) {
+        liveLogo.src = t.logo;
+        liveLogo.style.display = 'block';
+      } else {
+        liveLogo.style.display = 'none';
+      }
+
+      if (skipTeamKey !== k) {
+        const track = document.getElementById(`track-${k}`);
+        track.classList.remove('animating-slide');
+        track.style.transform = 'translateY(0)';
+        document.getElementById(`slot-${k}-cur`).textContent = curSetScore;
+        document.getElementById(`slot-${k}-next`).textContent = curSetScore;
+      }
+
+      document.getElementById(`sum-${k}-name`).textContent = t.name;
+      document.getElementById(`sum-${k}-bg`).style.background = `linear-gradient(90deg, ${t.color}dd 0%, ${t.color} 100%)`;
+      const sumLogo = document.getElementById(`sum-${k}-logo`);
+      if (t.logo) {
+        sumLogo.src = t.logo;
+        sumLogo.style.display = 'block';
+      } else {
+        sumLogo.style.display = 'none';
+      }
+
+      for (let s = 1; s <= 5; s++) {
+        const val = t[`s${s}`];
+        const cell = document.getElementById(`sum-${k}-s${s}`);
+        cell.textContent = (val === null || val === '' || val === undefined) ? '' : val;
+        cell.classList.toggle('current-set', s === state.currentSet);
+      }
+      document.getElementById(`sum-${k}-sets`).textContent = t.setsWon || 0;
+
+      const nameInput = document.getElementById(`in-${k}-name`);
+      if (document.activeElement !== nameInput) {
+        nameInput.value = t.name;
+      }
+      document.getElementById(`in-${k}-color`).value = t.color;
+      document.getElementById(`del-logo-${k}`).style.display = t.logo ? 'inline-block' : 'none';
+    });
+
+    adjustResponsiveScale();
+  }
+
+  function playScoreAnimation(teamKey, delta, oldScore, newScore) {
+    if (animTimers[teamKey]) {
+      clearTimeout(animTimers[teamKey]);
+      animTimers[teamKey] = null;
+    }
+
+    const track = document.getElementById(`track-${teamKey}`);
+    const curSlot = document.getElementById(`slot-${teamKey}-cur`);
+    const plusSlot = document.getElementById(`slot-${teamKey}-plus`);
+    const nextSlot = document.getElementById(`slot-${teamKey}-next`);
+
+    track.classList.remove('animating-slide');
+
+    if (delta === 1) {
+      curSlot.textContent = oldScore;
+      plusSlot.textContent = '+1';
+      nextSlot.textContent = newScore;
+      void track.offsetWidth;
+      track.classList.add('animating-slide');
+
+      animTimers[teamKey] = setTimeout(() => {
+        track.classList.remove('animating-slide');
+        track.style.transform = 'translateY(0)';
+        curSlot.textContent = newScore;
+      }, 1160);
+    } else {
+      curSlot.textContent = newScore;
+      nextSlot.textContent = newScore;
+    }
+  }
+
+  function addScore(teamKey, delta) {
+    const sKey = `s${state.currentSet}`;
+    const oldScore = getSetScore(state[teamKey], state.currentSet);
+    const newScore = Math.max(0, oldScore + delta);
+    state[teamKey][sKey] = newScore;
+
+    if (delta > 0) {
+      state.serve = teamKey;
+    }
+
+    saveState(false, { type: 'score_update', teamKey, delta, oldScore, newScore });
+    pushFirebaseLog(`${state[teamKey].name} 第${state.currentSet}局 ${delta > 0 ? '+' + delta : delta}`, { teamKey, delta, oldScore, newScore });
+
+    renderUI(teamKey);
+    playScoreAnimation(teamKey, delta, oldScore, newScore);
+
+    channel.postMessage({ type: 'score_update', state, teamKey, delta, oldScore, newScore });
+  }
+
+  function changeSetsWon(teamKey, delta) {
+    state[teamKey].setsWon = Math.max(0, Math.min(5, (state[teamKey].setsWon || 0) + delta));
+    saveState(true);
+    pushFirebaseLog(`${state[teamKey].name} 勝局數變更為 ${state[teamKey].setsWon}`);
+    renderUI();
+  }
+
+  function winCurrentSet(teamKey) {
+    state[teamKey].setsWon = Math.min(5, (state[teamKey].setsWon || 0) + 1);
+    if (state.currentSet < 5) {
+      state.currentSet += 1;
+      const nextKey = `s${state.currentSet}`;
+      if (state.t1[nextKey] === null || state.t1[nextKey] === undefined) state.t1[nextKey] = 0;
+      if (state.t2[nextKey] === null || state.t2[nextKey] === undefined) state.t2[nextKey] = 0;
+      state.t1.timeouts = 0;
+      state.t2.timeouts = 0;
+    }
+    saveState(true);
+    pushFirebaseLog(`${state[teamKey].name} 拿下本局，進入第 ${state.currentSet} 局`);
+    renderUI();
+  }
+
+  function changeSet(s) {
+    state.currentSet = s;
+    state.t1.timeouts = 0;
+    state.t2.timeouts = 0;
+
+    const sKey = `s${s}`;
+    if (state.t1[sKey] === null || state.t1[sKey] === undefined) state.t1[sKey] = 0;
+    if (state.t2[sKey] === null || state.t2[sKey] === undefined) state.t2[sKey] = 0;
+
+    saveState(true);
+    pushFirebaseLog(`切換至第 ${s} 局`);
+    renderUI();
+  }
+
+  function setServe(target) {
+    state.serve = target;
+    saveState(true);
+    renderUI();
+  }
+
+  function changeTimeouts(teamKey, delta) {
+    state[teamKey].timeouts = Math.max(0, Math.min(2, (state[teamKey].timeouts || 0) + delta));
+    saveState(true);
+    renderUI();
+  }
+
+  function updateGameTitle() {
+    state.gameTitle = document.getElementById('in-game-title').value;
+    saveState(true);
+    renderUI();
+  }
+
+  function updateTeamMeta(teamKey) {
+    state[teamKey].name = document.getElementById(`in-${teamKey}-name`).value;
+    state[teamKey].color = document.getElementById(`in-${teamKey}-color`).value;
+    saveState(true);
+    renderUI();
+  }
+
+  function normalizeLogoToSquare(dataUrl, callback) {
+    const img = new Image();
+    img.onload = () => {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.drawImage(img, 0, 0);
+
+      let minX = 0, minY = 0, maxX = img.width, maxY = img.height;
+      try {
+        const imgData = tempCtx.getImageData(0, 0, img.width, img.height).data;
+        let top = img.height, left = img.width, right = 0, bottom = 0;
+        let found = false;
+        for (let y = 0; y < img.height; y++) {
+          for (let x = 0; x < img.width; x++) {
+            const alpha = imgData[(y * img.width + x) * 4 + 3];
+            if (alpha > 15) {
+              if (x < left) left = x;
+              if (x > right) right = x;
+              if (y < top) top = y;
+              if (y > bottom) bottom = y;
+              found = true;
+            }
+          }
+        }
+        if (found && right >= left && bottom >= top) {
+          minX = left;
+          minY = top;
+          maxX = right + 1;
+          maxY = bottom + 1;
+        }
+      } catch (e) {}
+
+      const cropW = Math.max(1, maxX - minX);
+      const cropH = Math.max(1, maxY - minY);
+      const targetSize = 256;
+      const padding = 8;
+      const avail = targetSize - padding * 2;
+      const scale = Math.min(avail / cropW, avail / cropH);
+      const drawW = cropW * scale;
+      const drawH = cropH * scale;
+      const dx = (targetSize - drawW) / 2;
+      const dy = (targetSize - drawH) / 2;
+
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = targetSize;
+      outCanvas.height = targetSize;
+      const outCtx = outCanvas.getContext('2d');
+      outCtx.drawImage(img, minX, minY, cropW, cropH, dx, dy, drawW, drawH);
+
+      callback(outCanvas.toDataURL('image/png'));
+    };
+    img.onerror = () => callback(dataUrl);
+    img.src = dataUrl;
+  }
+
+  function uploadLogo(teamKey, inputEl) {
+    const file = inputEl.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      normalizeLogoToSquare(e.target.result, (squareDataUrl) => {
+        state[teamKey].logo = squareDataUrl;
+        saveState(true);
+        renderUI();
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeLogo(teamKey) {
+    state[teamKey].logo = '';
+    saveState(true);
+    renderUI();
+  }
+
+  function resetAllScores() {
+    state.currentSet = 1;
+    state.serve = 'none';
+    ['t1', 't2'].forEach(k => {
+      state[k].timeouts = 0;
+      state[k].setsWon = 0;
+      state[k].s1 = 0;
+      state[k].s2 = null;
+      state[k].s3 = null;
+      state[k].s4 = null;
+      state[k].s5 = null;
+    });
+    saveState(true);
+    pushFirebaseLog('歸零重設');
+    renderUI();
+  }
+
+  stateRef.on('value', (snapshot) => {
+    const cloudData = snapshot.val();
+    if (!cloudData) return;
+
+    const incomingActionId = cloudData.lastAction ? cloudData.lastAction.actionId : 0;
+    if (incomingActionId && incomingActionId === lastActionId) return;
+    lastActionId = incomingActionId;
+
+    state = {
+      ...defaultState,
+      ...cloudData,
+      t1: { ...defaultState.t1, ...(cloudData.t1 || {}) },
+      t2: { ...defaultState.t2, ...(cloudData.t2 || {}) }
+    };
+    localStorage.setItem('vb_clean_state_v2', JSON.stringify(state));
+
+    if (cloudData.lastAction && cloudData.lastAction.type === 'score_update') {
+      const act = cloudData.lastAction;
+      renderUI(act.teamKey);
+      playScoreAnimation(act.teamKey, act.delta, act.oldScore, act.newScore);
+    } else {
+      renderUI();
+    }
+  });
+
+  channel.onmessage = (ev) => {
+    if (!ev.data) return;
+    if (ev.data.type === 'sync') {
+      state = ev.data.state;
+      renderUI();
+    } else if (ev.data.type === 'score_update') {
+      state = ev.data.state;
+      renderUI(ev.data.teamKey);
+      playScoreAnimation(ev.data.teamKey, ev.data.delta, ev.data.oldScore, ev.data.newScore);
+    }
+  };
+
+  window.addEventListener('storage', (ev) => {
+    if (ev.key === 'vb_clean_state_v2' && ev.newValue) {
+      state = JSON.parse(ev.newValue);
+      renderUI();
+    }
+  });
+
+  renderUI();
+</script>
+</body>
+</html>
