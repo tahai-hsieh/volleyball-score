@@ -105,6 +105,40 @@
     flex-direction: row-reverse;
   }
 
+  /* 發球權金色側標 (位於兩隊最外側) */
+  .live-serve-tab {
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg, #d7b47c 0%, #b88c4a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+  }
+
+  .live-serve-tab.active {
+    width: 48px;
+    opacity: 1;
+  }
+
+  .live-team.home .live-serve-tab.active {
+    border-right: 2px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .live-team.away .live-serve-tab.active {
+    border-left: 2px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .serve-ball-svg {
+    width: 30px;
+    height: 30px;
+    fill: #5a3510;
+    filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.25));
+    flex-shrink: 0;
+  }
+
   .live-team-banner {
     display: flex;
     align-items: center;
@@ -231,35 +265,97 @@
     margin-top: 2px;
   }
 
+  /* 底部資訊列與暫停牌 (1st / 2nd TIME OUT) */
   .live-bottom-bar {
     background: #090d14;
     color: #ffffff;
     min-height: 44px;
     padding: 4px 18px;
     border-top: 2px solid rgba(255, 255, 255, 0.12);
-    display: flex;
+    display: grid;
+    grid-template-columns: 452px 140px 452px;
     align-items: center;
     justify-content: center;
     width: 100%;
+    position: relative;
+  }
+
+  .live-to-slot {
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    z-index: 2;
+  }
+
+  .live-to-slot.home {
+    justify-content: flex-end;
+    padding-right: 4px;
+  }
+
+  .live-to-slot.away {
+    justify-content: flex-start;
+    padding-left: 4px;
+  }
+
+  .timeout-badge {
+    display: none;
+    background: linear-gradient(180deg, #991b1b 0%, #7f1d1d 100%);
+    color: #ffffff;
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: 1.2px;
+    padding: 4px 18px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.65);
+    text-transform: uppercase;
+    line-height: 1.1;
+    animation: popTimeout 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .timeout-badge.active {
+    display: inline-flex;
+    align-items: baseline;
+  }
+
+  .timeout-badge sup {
+    font-size: 12px;
+    margin-right: 4px;
+    font-weight: 900;
+  }
+
+  @keyframes popTimeout {
+    0% { transform: translateY(-6px) scale(0.95); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
   }
 
   .live-title-wrap {
-    flex: 1;
-    min-width: 0;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
   }
 
   .live-title-text {
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 900;
     letter-spacing: 1.5px;
     text-align: center;
     color: #f8fafc;
     line-height: 1.25;
     white-space: pre;
+    transition: opacity 0.2s ease;
+  }
+
+  /* 當任一隊顯示暫停牌時，自動淡化底欄中央標題避免視覺擁擠 */
+  .live-bottom-bar.has-timeout .live-title-text {
+    opacity: 0.22;
   }
 
   /* =========================================================
@@ -456,6 +552,10 @@
     margin-bottom: 12px;
   }
 
+  .ctrl-row:last-child {
+    margin-bottom: 0;
+  }
+
   .ctrl-row label {
     display: block;
     font-size: 12.5px;
@@ -495,6 +595,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
   }
 
   .ctrl-btn {
@@ -536,6 +637,74 @@
   .btn-p1 { background: #0284c7; }
   .btn-p2 { background: #16a34a; }
   .btn-m1 { background: #dc2626; }
+
+  /* 發球權與暫停控制列 */
+  .tactical-btn-group {
+    display: grid;
+    grid-template-columns: 1.1fr 1.1fr auto;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .serve-btn {
+    background: #283040;
+    color: #e2e8f0;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 11px 10px;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+  }
+
+  .serve-btn.active {
+    background: linear-gradient(180deg, #d7b47c 0%, #b88c4a 100%);
+    color: #2b1704;
+    border-color: #fde68a;
+    box-shadow: 0 0 12px rgba(215, 180, 124, 0.45);
+  }
+
+  .to-btn {
+    background: #881337;
+    color: #ffffff;
+    border: 1px solid #be123c;
+    border-radius: 6px;
+    padding: 11px 10px;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+  }
+
+  .to-btn.active {
+    background: #dc2626;
+    border-color: #fca5a5;
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.5);
+  }
+
+  .to-sub-btn {
+    background: #283040;
+    color: #cbd5e1;
+    border: 1px solid #3b465c;
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 12.5px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .to-sub-btn:hover {
+    background: #333d52;
+  }
 </style>
 </head>
 <body>
@@ -547,7 +716,14 @@
       <div class="scale-inner" id="scale-inner-live">
         <div class="live-scorebug-wrapper">
           <div class="live-scorebug">
+            <!-- 主隊 (左側) -->
             <div class="live-team home">
+              <!-- 主隊發球圖示 (最左側) -->
+              <div class="live-serve-tab" id="live-t1-serve">
+                <svg class="serve-ball-svg" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 2.07c3.07.38 5.67 2.35 6.96 5.08-2.34-.65-4.88-.32-6.96.85V4.07zM8.1 4.96c.88-.48 1.86-.79 2.9-.89v4.85c-1.85.85-3.32 2.37-4.08 4.25-1.12-1.89-1.36-4.18-.57-6.29.46-.73 1.05-1.38 1.75-1.92zM4.26 14.54c.67-2.29 2.27-4.18 4.44-5.15.96 1.73 2.58 3.04 4.54 3.61l-1.92 3.33c-2.73-.19-5.26-1.56-7.06-1.79zm7.74 5.46c-1.15 0-2.25-.24-3.25-.68l1.97-3.41c2.22.12 4.41-.62 6.03-2.12.92 1.63 1.24 3.55.89 5.41-1.61.52-3.58.8-5.64.8zm6.92-2.22c.13-1.63-.29-3.27-1.19-4.65 1.1-.88 2.45-1.38 3.86-1.42.11.61.17 1.24.17 1.89 0 1.56-.45 3.01-1.23 4.24-.52-.04-1.06-.05-1.61-.06z"/>
+                </svg>
+              </div>
               <div class="live-team-banner" id="live-t1-bg" style="background: #0d5c3d;">
                 <img id="live-t1-logo" class="live-logo" src="" alt="" style="display:none;">
                 <div class="live-info">
@@ -569,7 +745,13 @@
               <div class="live-center-set-score" id="live-set-score">0 - 0</div>
             </div>
 
+            <!-- 客隊 (右側，因 row-reverse 故發球圖示在最外側右端) -->
             <div class="live-team away">
+              <div class="live-serve-tab" id="live-t2-serve">
+                <svg class="serve-ball-svg" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 2.07c3.07.38 5.67 2.35 6.96 5.08-2.34-.65-4.88-.32-6.96.85V4.07zM8.1 4.96c.88-.48 1.86-.79 2.9-.89v4.85c-1.85.85-3.32 2.37-4.08 4.25-1.12-1.89-1.36-4.18-.57-6.29.46-.73 1.05-1.38 1.75-1.92zM4.26 14.54c.67-2.29 2.27-4.18 4.44-5.15.96 1.73 2.58 3.04 4.54 3.61l-1.92 3.33c-2.73-.19-5.26-1.56-7.06-1.79zm7.74 5.46c-1.15 0-2.25-.24-3.25-.68l1.97-3.41c2.22.12 4.41-.62 6.03-2.12.92 1.63 1.24 3.55.89 5.41-1.61.52-3.58.8-5.64.8zm6.92-2.22c.13-1.63-.29-3.27-1.19-4.65 1.1-.88 2.45-1.38 3.86-1.42.11.61.17 1.24.17 1.89 0 1.56-.45 3.01-1.23 4.24-.52-.04-1.06-.05-1.61-.06z"/>
+                </svg>
+              </div>
               <div class="live-team-banner" id="live-t2-bg" style="background: #1b4965;">
                 <img id="live-t2-logo" class="live-logo" src="" alt="" style="display:none;">
                 <div class="live-info">
@@ -586,7 +768,15 @@
             </div>
           </div>
 
+          <!-- 底部資訊列與兩隊 TIME OUT 顯示區 -->
           <div class="live-bottom-bar" id="live-bottom-bar">
+            <div class="live-to-slot home">
+              <div class="timeout-badge" id="live-t1-to">1<sup>st</sup> TIME OUT</div>
+            </div>
+            <div></div>
+            <div class="live-to-slot away">
+              <div class="timeout-badge" id="live-t2-to">1<sup>st</sup> TIME OUT</div>
+            </div>
             <div class="live-title-wrap">
               <div class="live-title-text" id="live-title-display">台灣職業排球聯賽 例行賽</div>
             </div>
@@ -659,13 +849,15 @@
         <button class="period-btn" id="pbtn-4" onclick="changeSet(4)">Set 4</button>
         <button class="period-btn" id="pbtn-5" onclick="changeSet(5)">Set 5</button>
       </div>
-      <div style="display:flex; align-items:center; gap:10px;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         <span class="fb-status-badge" id="fb-status">連線中...</span>
+        <button class="ctrl-btn" onclick="switchServe()">🏐 切換發球</button>
         <button class="ctrl-btn" style="background:#7f1d1d; border-color:#991b1b;" onclick="resetAllScores()">🔄 歸零重設</button>
       </div>
     </div>
 
     <div class="teams-ctrl-grid">
+      <!-- 主隊控制卡 -->
       <div class="team-ctrl-card">
         <div class="ctrl-row">
           <label>主隊名稱 & 代表色</label>
@@ -683,6 +875,14 @@
           </div>
         </div>
         <div class="ctrl-row">
+          <label>發球權 & 暫停控制 (本局已用暫停：<span id="to-status-t1">0 / 2</span>)</label>
+          <div class="tactical-btn-group">
+            <button class="serve-btn" id="btn-serve-t1" onclick="toggleServe('t1')">🏐 發球權</button>
+            <button class="to-btn" id="btn-to-t1" onclick="triggerTimeOut('t1')">⏱️ TO +1</button>
+            <button class="to-sub-btn" onclick="hideTimeOut('t1')" title="收起畫面上的暫停字卡">關閉顯示</button>
+          </div>
+        </div>
+        <div class="ctrl-row">
           <label>加扣分控制</label>
           <div class="score-btn-group">
             <button class="score-btn btn-p1" onclick="addScore('t1', 1)">+1</button>
@@ -692,6 +892,7 @@
         </div>
       </div>
 
+      <!-- 客隊控制卡 -->
       <div class="team-ctrl-card">
         <div class="ctrl-row">
           <label>客隊名稱 & 代表色</label>
@@ -709,6 +910,14 @@
           </div>
         </div>
         <div class="ctrl-row">
+          <label>發球權 & 暫停控制 (本局已用暫停：<span id="to-status-t2">0 / 2</span>)</label>
+          <div class="tactical-btn-group">
+            <button class="serve-btn" id="btn-serve-t2" onclick="toggleServe('t2')">🏐 發球權</button>
+            <button class="to-btn" id="btn-to-t2" onclick="triggerTimeOut('t2')">⏱️ TO +1</button>
+            <button class="to-sub-btn" onclick="hideTimeOut('t2')" title="收起畫面上的暫停字卡">關閉顯示</button>
+          </div>
+        </div>
+        <div class="ctrl-row">
           <label>加扣分控制</label>
           <div class="score-btn-group">
             <button class="score-btn btn-p1" onclick="addScore('t2', 1)">+1</button>
@@ -721,7 +930,7 @@
   </div>
 
 <script>
-  // 防止手機端雙擊縮放
+  // 防止行動裝置雙擊縮放
   let lastTouchEnd = 0;
   document.addEventListener('touchend', (e) => {
     const now = Date.now();
@@ -732,7 +941,7 @@
     lastTouchEnd = now;
   }, { passive: false });
 
-  // 視角切換判定
+  // 視角模式判定
   const params = new URLSearchParams(window.location.search);
   const viewParam = params.get('view');
   if (viewParam === 'volleyball_live') {
@@ -774,8 +983,23 @@
     return {
       gameTitle: '台灣職業排球聯賽 例行賽',
       currentSet: 1,
-      t1: { name: '臺中連莊', color: '#0d5c3d', logo: '', s1: 0, s2: '', s3: '', s4: '', s5: '' },
-      t2: { name: '台鋼天鷹', color: '#1b4965', logo: '', s1: 0, s2: '', s3: '', s4: '', s5: '' },
+      servingTeam: '', // 't1' | 't2' | ''
+      t1: {
+        name: '臺中連莊',
+        color: '#0d5c3d',
+        logo: '',
+        s1: 0, s2: '', s3: '', s4: '', s5: '',
+        toCount: 0,
+        toShowing: false
+      },
+      t2: {
+        name: '台鋼天鷹',
+        color: '#1b4965',
+        logo: '',
+        s1: 0, s2: '', s3: '', s4: '', s5: '',
+        toCount: 0,
+        toShowing: false
+      },
       lastAction: null
     };
   }
@@ -790,8 +1014,7 @@
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        return normalizeState(parsed);
+        return normalizeState(JSON.parse(saved));
       }
       return getDefaultState();
     } catch (e) {
@@ -799,19 +1022,25 @@
     }
   }
 
-  // 確保從 Firebase 取回時不會因為空字串或 null 被吃掉而缺屬性
   function normalizeState(raw) {
     const def = getDefaultState();
     if (!raw || typeof raw !== 'object') return def;
-    const merged = {
+    const t1 = Object.assign({}, def.t1, raw.t1 || {});
+    const t2 = Object.assign({}, def.t2, raw.t2 || {});
+    t1.toCount = Number(t1.toCount) || 0;
+    t1.toShowing = Boolean(t1.toShowing);
+    t2.toCount = Number(t2.toCount) || 0;
+    t2.toShowing = Boolean(t2.toShowing);
+
+    return {
       gameTitle: raw.gameTitle !== undefined ? raw.gameTitle : def.gameTitle,
       currentSet: Number(raw.currentSet) || 1,
-      t1: Object.assign({}, def.t1, raw.t1 || {}),
-      t2: Object.assign({}, def.t2, raw.t2 || {}),
+      servingTeam: raw.servingTeam || '',
+      t1,
+      t2,
       lastAction: raw.lastAction || null,
       updatedAt: raw.updatedAt || null
     };
-    return merged;
   }
 
   function saveState(broadcast = true) {
@@ -840,23 +1069,20 @@
     }, 120);
   }
 
-  // 監聽 Firebase 資料變動與遠端刪除重整訊號
+  // 監聽 Firebase 即時資料庫變動
   dbRef.on('value', (snapshot) => {
     if (isReloading) return;
     const val = snapshot.val();
 
-    // 情況 1：收到強制重設訊號
     if (val && val._forceReset) {
       wipeLocalAndReload();
       return;
     }
 
-    // 情況 2：原本有資料，但資料庫節點被刪除 (val === null)
     if (val === null) {
       if (hasSyncedDataOnce) {
         wipeLocalAndReload();
       } else {
-        // 首次開啟且 Firebase 為空時，維持乾淨歸零狀態
         localStorage.removeItem(STORAGE_KEY);
         state = getDefaultState();
         renderUI();
@@ -868,7 +1094,6 @@
     state = normalizeState(val);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
-    // 檢查是否為新的得分動作（跨裝置觸發 OBS 得分動畫）
     const action = state.lastAction;
     if (
       action &&
@@ -891,7 +1116,7 @@
       const score = Number(teamObj[`s${i}`]);
       const opponentKey = teamObj === state.t1 ? 't2' : 't1';
       const oppScore = Number(state[opponentKey][`s${i}`]);
-      
+
       if (!isNaN(score) && !isNaN(oppScore) && teamObj[`s${i}`] !== '' && teamObj[`s${i}`] !== null) {
         const target = i === 5 ? 15 : 25;
         if (score >= target && score - oppScore >= 2) {
@@ -941,6 +1166,24 @@
       if (btn) btn.classList.toggle('active', state.currentSet === p);
     }
 
+    // 發球權顯示更新
+    ['t1', 't2'].forEach(k => {
+      const isServing = state.servingTeam === k;
+      const serveTab = document.getElementById(`live-${k}-serve`);
+      if (serveTab) serveTab.classList.toggle('active', isServing);
+
+      const serveBtn = document.getElementById(`btn-serve-${k}`);
+      if (serveBtn) {
+        serveBtn.classList.toggle('active', isServing);
+        serveBtn.textContent = isServing ? '🏐 發球中' : '🏐 發球權';
+      }
+    });
+
+    // 暫停牌與底欄狀態更新
+    const anyTimeoutShowing = (state.t1.toShowing && state.t1.toCount > 0) || (state.t2.toShowing && state.t2.toCount > 0);
+    const bottomBar = document.getElementById('live-bottom-bar');
+    if (bottomBar) bottomBar.classList.toggle('has-timeout', anyTimeoutShowing);
+
     ['t1', 't2'].forEach(k => {
       const t = state[k];
       const curSetScore = (t[`s${state.currentSet}`] !== null && t[`s${state.currentSet}`] !== undefined && t[`s${state.currentSet}`] !== '') ? t[`s${state.currentSet}`] : 0;
@@ -964,6 +1207,29 @@
         document.getElementById(`slot-${k}-next`).textContent = curSetScore;
       }
 
+      // 渲染 1st TIME OUT / 2nd TIME OUT 標籤
+      const toBadge = document.getElementById(`live-${k}-to`);
+      if (toBadge) {
+        if (t.toShowing && t.toCount > 0) {
+          const ordSup = t.toCount === 1 ? 'st' : 'nd';
+          toBadge.innerHTML = `${t.toCount}<sup>${ordSup}</sup> TIME OUT`;
+          toBadge.classList.add('active');
+        } else {
+          toBadge.classList.remove('active');
+        }
+      }
+
+      // 控制台 TO 狀態顯示
+      const toStatus = document.getElementById(`to-status-${k}`);
+      if (toStatus) {
+        toStatus.textContent = `${t.toCount || 0} / 2${t.toShowing ? ' (顯示中)' : ''}`;
+      }
+      const toBtn = document.getElementById(`btn-to-${k}`);
+      if (toBtn) {
+        toBtn.classList.toggle('active', Boolean(t.toShowing && t.toCount > 0));
+      }
+
+      // 總計分板 (Summary)
       document.getElementById(`sum-${k}-name`).textContent = t.name;
       document.getElementById(`sum-${k}-bg`).style.background = `linear-gradient(90deg, ${t.color}dd 0%, ${t.color} 100%)`;
       const sumLogo = document.getElementById(`sum-${k}-logo`);
@@ -1023,11 +1289,71 @@
     }
   }
 
+  // 發球權設定與切換
+  function toggleServe(teamKey) {
+    state.servingTeam = (state.servingTeam === teamKey) ? '' : teamKey;
+    state.lastAction = null;
+    saveState(true);
+    renderUI();
+  }
+
+  function switchServe() {
+    if (state.servingTeam === 't1') {
+      state.servingTeam = 't2';
+    } else {
+      state.servingTeam = 't1';
+    }
+    state.lastAction = null;
+    saveState(true);
+    renderUI();
+  }
+
+  // TO +1 按鍵邏輯：0 -> 1st TIME OUT -> 2nd TIME OUT -> 歸零關閉
+  function triggerTimeOut(teamKey) {
+    const t = state[teamKey];
+    const curCount = Number(t.toCount) || 0;
+
+    if (curCount === 0) {
+      t.toCount = 1;
+      t.toShowing = true;
+    } else if (curCount === 1) {
+      t.toCount = 2;
+      t.toShowing = true;
+    } else {
+      // 已達 2 次暫停時：若已隱藏則再次顯示 2nd TIME OUT；若正顯示中則歸零重設本局暫停
+      if (!t.toShowing) {
+        t.toShowing = true;
+      } else {
+        t.toCount = 0;
+        t.toShowing = false;
+      }
+    }
+
+    state.lastAction = null;
+    saveState(true);
+    renderUI();
+  }
+
+  // 隱藏畫面上的 TIME OUT 字卡（保留本局已叫暫停次數）
+  function hideTimeOut(teamKey) {
+    state[teamKey].toShowing = false;
+    state.lastAction = null;
+    saveState(true);
+    renderUI();
+  }
+
   function addScore(teamKey, delta) {
     const sKey = `s${state.currentSet}`;
     const oldScore = Number(state[teamKey][sKey] || 0);
     state[teamKey][sKey] = Math.max(0, oldScore + delta);
     const newScore = Number(state[teamKey][sKey]);
+
+    // 當比賽繼續進行（加分）時，自動收起場上的暫停牌並將發球權交給得分方
+    if (delta > 0) {
+      state.t1.toShowing = false;
+      state.t2.toShowing = false;
+      state.servingTeam = teamKey;
+    }
 
     const actionId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     lastProcessedActionId = actionId;
@@ -1053,7 +1379,14 @@
     const sKey = `s${s}`;
     if (state.t1[sKey] === null || state.t1[sKey] === undefined || state.t1[sKey] === '') state.t1[sKey] = 0;
     if (state.t2[sKey] === null || state.t2[sKey] === undefined || state.t2[sKey] === '') state.t2[sKey] = 0;
+
+    // 換局時自動重設兩隊單局暫停次數與顯示狀態
+    state.t1.toCount = 0;
+    state.t1.toShowing = false;
+    state.t2.toCount = 0;
+    state.t2.toShowing = false;
     state.lastAction = null;
+
     saveState(true);
     renderUI();
   }
@@ -1101,19 +1434,15 @@
   async function resetAllScores() {
     if (isReloading) return;
 
-    // 1. 通知同瀏覽器分頁立即清除重整
     channel.postMessage({ type: 'hard_reset' });
 
     try {
-      // 2. 先發送強制重設訊號給所有遠端 OBS 視窗（確保即使原本資料庫為空也能觸發 OBS 重整）
       await dbRef.set({ _forceReset: Date.now() });
-      // 3. 徹底刪除 Firebase 根目錄所有資料
       await db.ref().remove();
     } catch (err) {
       console.error('Firebase 刪除失敗:', err);
     }
 
-    // 4. 清除本機所有儲存資料並重新整理
     wipeLocalAndReload();
   }
 
