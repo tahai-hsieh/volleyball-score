@@ -115,7 +115,7 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+    transition: width 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
   }
 
   .live-serve-tab.active {
@@ -353,7 +353,6 @@
     transition: opacity 0.2s ease;
   }
 
-  /* 當任一隊顯示暫停牌時，自動淡化底欄中央標題避免視覺擁擠 */
   .live-bottom-bar.has-timeout .live-title-text {
     opacity: 0.22;
   }
@@ -492,7 +491,7 @@
   .fb-status-badge {
     font-size: 12px;
     font-weight: bold;
-    padding: 4px 10px;
+    padding: 5px 10px;
     border-radius: 999px;
     background: #1e293b;
     color: #94a3b8;
@@ -503,6 +502,12 @@
     background: rgba(22, 163, 74, 0.15);
     color: #4ade80;
     border-color: #16a34a;
+  }
+
+  .fb-status-badge.error {
+    background: rgba(220, 38, 38, 0.2);
+    color: #fca5a5;
+    border-color: #ef4444;
   }
 
   .period-selector {
@@ -838,7 +843,7 @@
   <div id="control-section">
     <div class="ctrl-top-bar">
       <div class="ctrl-row" style="margin-bottom:0; flex:1; min-width:240px;">
-        <label>賽事名稱 (按 Enter 可手動換行)</label>
+        <label>賽事名稱 (按 Enter 可手動換行，歸零時保留)</label>
         <textarea class="team-name-input" id="in-game-title" rows="2" oninput="updateGameTitle()">台灣職業排球聯賽 例行賽</textarea>
       </div>
       <div class="period-selector">
@@ -850,9 +855,9 @@
         <button class="period-btn" id="pbtn-5" onclick="changeSet(5)">Set 5</button>
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <span class="fb-status-badge" id="fb-status">連線中...</span>
+        <span class="fb-status-badge" id="fb-status">連線檢測中...</span>
         <button class="ctrl-btn" onclick="switchServe()">🏐 切換發球</button>
-        <button class="ctrl-btn" style="background:#7f1d1d; border-color:#991b1b;" onclick="resetAllScores()">🔄 歸零重設</button>
+        <button class="ctrl-btn" style="background:#7f1d1d; border-color:#991b1b;" onclick="resetAllScores()">🔄 歸零重設 (僅清除紀錄)</button>
       </div>
     </div>
 
@@ -860,14 +865,14 @@
       <!-- 主隊控制卡 -->
       <div class="team-ctrl-card">
         <div class="ctrl-row">
-          <label>主隊名稱 & 代表色</label>
+          <label>主隊名稱 & 代表色 (歸零時保留)</label>
           <div class="input-with-color">
             <input type="text" class="team-name-input" id="in-t1-name" value="臺中連莊" oninput="updateTeamMeta('t1')">
             <input type="color" class="color-picker-input" id="in-t1-color" value="#0d5c3d" oninput="updateTeamMeta('t1')">
           </div>
         </div>
         <div class="ctrl-row">
-          <label>球隊 Logo</label>
+          <label>球隊 Logo (歸零時保留)</label>
           <div class="logo-upload-row">
             <button class="ctrl-btn" onclick="document.getElementById('file-t1').click()">📁 選擇圖片上傳</button>
             <button class="ctrl-btn" id="del-logo-t1" style="display:none;" onclick="removeLogo('t1')">✕ 移除</button>
@@ -895,14 +900,14 @@
       <!-- 客隊控制卡 -->
       <div class="team-ctrl-card">
         <div class="ctrl-row">
-          <label>客隊名稱 & 代表色</label>
+          <label>客隊名稱 & 代表色 (歸零時保留)</label>
           <div class="input-with-color">
             <input type="text" class="team-name-input" id="in-t2-name" value="台鋼天鷹" oninput="updateTeamMeta('t2')">
             <input type="color" class="color-picker-input" id="in-t2-color" value="#1b4965" oninput="updateTeamMeta('t2')">
           </div>
         </div>
         <div class="ctrl-row">
-          <label>球隊 Logo</label>
+          <label>球隊 Logo (歸零時保留)</label>
           <div class="logo-upload-row">
             <button class="ctrl-btn" onclick="document.getElementById('file-t2').click()">📁 選擇圖片上傳</button>
             <button class="ctrl-btn" id="del-logo-t2" style="display:none;" onclick="removeLogo('t2')">✕ 移除</button>
@@ -941,9 +946,12 @@
     lastTouchEnd = now;
   }, { passive: false });
 
-  // 視角模式判定
+  // 支援 ?view=volleyball_live 或 #volleyball_live 兩種網址參數寫法
   const params = new URLSearchParams(window.location.search);
-  const viewParam = params.get('view');
+  const hashVal = window.location.hash.replace('#', '');
+  const viewParam = params.get('view') || hashVal;
+  const isOBSView = (viewParam === 'volleyball_live' || viewParam === 'volleyball_summary');
+
   if (viewParam === 'volleyball_live') {
     document.body.classList.add('view-live');
   } else if (viewParam === 'volleyball_summary') {
@@ -953,153 +961,252 @@
   }
 
   // =========================================================
-  // Firebase 初始化與設定
+  // Firebase 與雙核心同步設定 (SDK + REST API 雙保險)
   // =========================================================
-  const STORAGE_KEY = 'volleyball_clean_state_v1';
-  const channel = new BroadcastChannel('volleyball_clean_sync_v1');
+  const FB_BASE_URL = "https://volleyball-score-0000-default-rtdb.asia-southeast1.firebasedatabase.app";
+  const META_STORAGE_KEY = 'vb_meta_v3';     // 儲存賽事名稱、隊名、顏色、Logo (歸零時保留)
+  const RECORD_STORAGE_KEY = 'vb_record_v3'; // 儲存比分、勝局、暫停、發球方 (歸零時刪除重整)
+  const channel = new BroadcastChannel('volleyball_sync_v3');
 
-  const firebaseConfig = {
-    databaseURL: "https://volleyball-score-0000-default-rtdb.asia-southeast1.firebasedatabase.app/"
-  };
+  let db = null;
+  let dbRootRef = null;
+  let dbMetaRef = null;
+  let dbRecordRef = null;
+  let dbResetRef = null;
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-  const dbRef = db.ref('volleyball_scoreboard');
+  try {
+    firebase.initializeApp({ databaseURL: FB_BASE_URL });
+    db = firebase.database();
+    dbRootRef = db.ref('volleyball_scoreboard');
+    dbMetaRef = db.ref('volleyball_scoreboard/meta');
+    dbRecordRef = db.ref('volleyball_scoreboard/record');
+    dbResetRef = db.ref('volleyball_scoreboard/resetSignal');
+  } catch (err) {
+    console.warn('Firebase SDK 初始化備援:', err);
+  }
 
-  // 監測 Firebase 連線狀態
-  db.ref('.info/connected').on('value', (snap) => {
+  function updateStatusBadge(status, msg) {
     const badge = document.getElementById('fb-status');
     if (!badge) return;
-    if (snap.val() === true) {
-      badge.textContent = '🟢 Firebase 已同步';
+    badge.classList.remove('online', 'error');
+    if (status === 'online') {
+      badge.textContent = msg || '🟢 Firebase 雲端同步正常';
       badge.classList.add('online');
+    } else if (status === 'error') {
+      badge.textContent = msg || '⚠️ Firebase 權限未開 (請將 Rules 設為 true)';
+      badge.classList.add('error');
     } else {
-      badge.textContent = '🔴 離線 (本機模式)';
-      badge.classList.remove('online');
+      badge.textContent = msg || '🔴 離線 (本機模式)';
     }
-  });
+  }
 
-  function getDefaultState() {
+  function makeSyncId() {
+    return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  // 預設球隊與賽事設定 (歸零時保留)
+  function getDefaultMeta() {
     return {
       gameTitle: '台灣職業排球聯賽 例行賽',
+      t1: { name: '臺中連莊', color: '#0d5c3d', logo: '' },
+      t2: { name: '台鋼天鷹', color: '#1b4965', logo: '' },
+      syncId: 'init_meta'
+    };
+  }
+
+  // 預設比賽紀錄 (歸零時重置為此乾淨狀態)
+  function getDefaultRecord() {
+    return {
       currentSet: 1,
-      servingTeam: '', // 't1' | 't2' | ''
+      servingTeam: '',
+      t1: { s1: 0, s2: '', s3: '', s4: '', s5: '', toCount: 0, toShowing: false },
+      t2: { s1: 0, s2: '', s3: '', s4: '', s5: '', toCount: 0, toShowing: false },
+      lastAction: null,
+      syncId: 'init_record'
+    };
+  }
+
+  let metaState = loadLocalMeta();
+  let recordState = loadLocalRecord();
+  let animTimers = { t1: null, t2: null };
+  let isAnimating = { t1: false, t2: false };
+
+  let lastAppliedMetaSyncId = metaState.syncId || '';
+  let lastAppliedRecordSyncId = recordState.syncId || '';
+  let lastProcessedActionId = null;
+  let lastKnownResetToken = 0;
+  let lastLocalWriteTime = 0;
+
+  function loadLocalMeta() {
+    try {
+      const saved = localStorage.getItem(META_STORAGE_KEY);
+      return saved ? normalizeMeta(JSON.parse(saved)) : getDefaultMeta();
+    } catch (e) {
+      return getDefaultMeta();
+    }
+  }
+
+  function loadLocalRecord() {
+    try {
+      const saved = localStorage.getItem(RECORD_STORAGE_KEY);
+      return saved ? normalizeRecord(JSON.parse(saved)) : getDefaultRecord();
+    } catch (e) {
+      return getDefaultRecord();
+    }
+  }
+
+  function normalizeMeta(raw) {
+    const def = getDefaultMeta();
+    if (!raw || typeof raw !== 'object') return def;
+    return {
+      gameTitle: raw.gameTitle !== undefined ? String(raw.gameTitle) : def.gameTitle,
       t1: {
-        name: '臺中連莊',
-        color: '#0d5c3d',
-        logo: '',
-        s1: 0, s2: '', s3: '', s4: '', s5: '',
-        toCount: 0,
-        toShowing: false
+        name: raw.t1 && raw.t1.name !== undefined ? String(raw.t1.name) : def.t1.name,
+        color: raw.t1 && raw.t1.color ? String(raw.t1.color) : def.t1.color,
+        logo: raw.t1 && raw.t1.logo ? String(raw.t1.logo) : ''
       },
       t2: {
-        name: '台鋼天鷹',
-        color: '#1b4965',
-        logo: '',
-        s1: 0, s2: '', s3: '', s4: '', s5: '',
-        toCount: 0,
-        toShowing: false
+        name: raw.t2 && raw.t2.name !== undefined ? String(raw.t2.name) : def.t2.name,
+        color: raw.t2 && raw.t2.color ? String(raw.t2.color) : def.t2.color,
+        logo: raw.t2 && raw.t2.logo ? String(raw.t2.logo) : ''
       },
-      lastAction: null
+      syncId: raw.syncId ? String(raw.syncId) : def.syncId
     };
   }
 
-  let state = loadState();
-  let animTimers = { t1: null, t2: null };
-  let lastProcessedActionId = null;
-  let hasSyncedDataOnce = false;
-  let isReloading = false;
-
-  function loadState() {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return normalizeState(JSON.parse(saved));
-      }
-      return getDefaultState();
-    } catch (e) {
-      return getDefaultState();
-    }
-  }
-
-  function normalizeState(raw) {
-    const def = getDefaultState();
+  function normalizeRecord(raw) {
+    const def = getDefaultRecord();
     if (!raw || typeof raw !== 'object') return def;
-    const t1 = Object.assign({}, def.t1, raw.t1 || {});
-    const t2 = Object.assign({}, def.t2, raw.t2 || {});
-    t1.toCount = Number(t1.toCount) || 0;
-    t1.toShowing = Boolean(t1.toShowing);
-    t2.toCount = Number(t2.toCount) || 0;
-    t2.toShowing = Boolean(t2.toShowing);
-
+    const t1Raw = raw.t1 || {};
+    const t2Raw = raw.t2 || {};
     return {
-      gameTitle: raw.gameTitle !== undefined ? raw.gameTitle : def.gameTitle,
       currentSet: Number(raw.currentSet) || 1,
       servingTeam: raw.servingTeam || '',
-      t1,
-      t2,
+      t1: {
+        s1: t1Raw.s1 !== undefined && t1Raw.s1 !== null && t1Raw.s1 !== '' ? Number(t1Raw.s1) : 0,
+        s2: t1Raw.s2 !== undefined && t1Raw.s2 !== null && t1Raw.s2 !== '' ? Number(t1Raw.s2) : '',
+        s3: t1Raw.s3 !== undefined && t1Raw.s3 !== null && t1Raw.s3 !== '' ? Number(t1Raw.s3) : '',
+        s4: t1Raw.s4 !== undefined && t1Raw.s4 !== null && t1Raw.s4 !== '' ? Number(t1Raw.s4) : '',
+        s5: t1Raw.s5 !== undefined && t1Raw.s5 !== null && t1Raw.s5 !== '' ? Number(t1Raw.s5) : '',
+        toCount: Number(t1Raw.toCount) || 0,
+        toShowing: Boolean(t1Raw.toShowing)
+      },
+      t2: {
+        s1: t2Raw.s1 !== undefined && t2Raw.s1 !== null && t2Raw.s1 !== '' ? Number(t2Raw.s1) : 0,
+        s2: t2Raw.s2 !== undefined && t2Raw.s2 !== null && t2Raw.s2 !== '' ? Number(t2Raw.s2) : '',
+        s3: t2Raw.s3 !== undefined && t2Raw.s3 !== null && t2Raw.s3 !== '' ? Number(t2Raw.s3) : '',
+        s4: t2Raw.s4 !== undefined && t2Raw.s4 !== null && t2Raw.s4 !== '' ? Number(t2Raw.s4) : '',
+        s5: t2Raw.s5 !== undefined && t2Raw.s5 !== null && t2Raw.s5 !== '' ? Number(t2Raw.s5) : '',
+        toCount: Number(t2Raw.toCount) || 0,
+        toShowing: Boolean(t2Raw.toShowing)
+      },
       lastAction: raw.lastAction || null,
-      updatedAt: raw.updatedAt || null
+      syncId: raw.syncId ? String(raw.syncId) : def.syncId
     };
   }
 
-  function saveState(broadcast = true) {
-    state.updatedAt = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // 儲存球隊與賽事設定 (Meta - 歸零時保留)
+  async function saveMeta() {
+    lastLocalWriteTime = Date.now();
+    metaState.syncId = makeSyncId();
+    lastAppliedMetaSyncId = metaState.syncId;
 
-    if (broadcast) {
-      channel.postMessage({ type: 'sync', state });
-      dbRef.set(state).catch((err) => console.error('Firebase 寫入失敗:', err));
+    const cleanMeta = JSON.parse(JSON.stringify(metaState));
+    localStorage.setItem(META_STORAGE_KEY, JSON.stringify(cleanMeta));
+    channel.postMessage({ type: 'meta_sync', meta: cleanMeta });
+
+    if (dbMetaRef) {
+      dbMetaRef.set(cleanMeta).catch((err) => {
+        if (err && err.code === 'PERMISSION_DENIED') updateStatusBadge('error');
+      });
     }
-  }
-
-  // 強制清除本機快取並重整頁面（供控制台與 OBS 同步觸發）
-  function wipeLocalAndReload() {
-    if (isReloading) return;
-    isReloading = true;
     try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.clear();
-      sessionStorage.clear();
+      const res = await fetch(`${FB_BASE_URL}/volleyball_scoreboard/meta.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanMeta)
+      });
+      if (res.ok) {
+        updateStatusBadge('online');
+      } else if (res.status === 401 || res.status === 403) {
+        updateStatusBadge('error');
+      }
     } catch (e) {}
-    state = getDefaultState();
-    renderUI();
-    setTimeout(() => {
-      window.location.reload();
-    }, 120);
   }
 
-  // 監聽 Firebase 即時資料庫變動
-  dbRef.on('value', (snapshot) => {
-    if (isReloading) return;
-    const val = snapshot.val();
+  // 儲存比賽紀錄 (Record - 分數、局數、暫停、發球)
+  async function saveRecord() {
+    lastLocalWriteTime = Date.now();
+    recordState.syncId = makeSyncId();
+    lastAppliedRecordSyncId = recordState.syncId;
 
-    if (val && val._forceReset) {
-      wipeLocalAndReload();
-      return;
+    const cleanRecord = JSON.parse(JSON.stringify(recordState));
+    localStorage.setItem(RECORD_STORAGE_KEY, JSON.stringify(cleanRecord));
+    channel.postMessage({ type: 'record_sync', record: cleanRecord });
+
+    if (dbRecordRef) {
+      dbRecordRef.set(cleanRecord).catch((err) => {
+        if (err && err.code === 'PERMISSION_DENIED') updateStatusBadge('error');
+      });
     }
+    try {
+      const res = await fetch(`${FB_BASE_URL}/volleyball_scoreboard/record.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanRecord)
+      });
+      if (res.ok) {
+        updateStatusBadge('online');
+      } else if (res.status === 401 || res.status === 403) {
+        updateStatusBadge('error');
+      }
+    } catch (e) {}
+  }
 
-    if (val === null) {
-      if (hasSyncedDataOnce) {
-        wipeLocalAndReload();
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
-        state = getDefaultState();
-        renderUI();
+  // 執行本機與 OBS 端的「僅清除比賽紀錄」動作（保留球隊名稱、代表色與 Logo）
+  function performLocalRecordWipe() {
+    localStorage.removeItem(RECORD_STORAGE_KEY);
+    resetAnimationLocks();
+    recordState = getDefaultRecord();
+    lastAppliedRecordSyncId = recordState.syncId;
+    lastProcessedActionId = null;
+    renderUI();
+  }
+
+  // 套用遠端 Meta 設定
+  function applyIncomingMeta(rawMeta) {
+    if (!rawMeta) return;
+    const incoming = normalizeMeta(rawMeta);
+    if (incoming.syncId === lastAppliedMetaSyncId) return;
+    lastAppliedMetaSyncId = incoming.syncId;
+    metaState = incoming;
+    localStorage.setItem(META_STORAGE_KEY, JSON.stringify(metaState));
+    renderUI();
+  }
+
+  // 套用遠端 Record 比賽紀錄
+  function applyIncomingRecord(rawRecord) {
+    // 若雲端 record 被刪除 (null)，代表觸發了歸零重設 -> 立刻清除紀錄並歸零畫面
+    if (rawRecord === null || rawRecord === undefined) {
+      if (lastAppliedRecordSyncId !== 'init_record') {
+        performLocalRecordWipe();
       }
       return;
     }
 
-    hasSyncedDataOnce = true;
-    state = normalizeState(val);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const incoming = normalizeRecord(rawRecord);
+    if (incoming.syncId === lastAppliedRecordSyncId) return;
+    lastAppliedRecordSyncId = incoming.syncId;
 
-    const action = state.lastAction;
+    recordState = incoming;
+    localStorage.setItem(RECORD_STORAGE_KEY, JSON.stringify(recordState));
+
+    const action = recordState.lastAction;
     if (
       action &&
       action.id &&
       action.id !== lastProcessedActionId &&
-      Date.now() - action.timestamp < 5000
+      Date.now() - action.timestamp < 8000
     ) {
       lastProcessedActionId = action.id;
       renderUI(action.teamKey);
@@ -1108,16 +1215,114 @@
       if (action && action.id) lastProcessedActionId = action.id;
       renderUI();
     }
-  });
+  }
 
-  function getTeamSetsWon(teamObj) {
+  // 1. Firebase SDK 即時監聽 (分成 3 個獨立監聽器，確保刪除 record 時 OBS 立即反應)
+  if (dbMetaRef) {
+    dbMetaRef.on('value', (snap) => {
+      const val = snap.val();
+      if (val) applyIncomingMeta(val);
+    }, (err) => {
+      if (err && err.code === 'PERMISSION_DENIED') updateStatusBadge('error');
+    });
+  }
+
+  if (dbRecordRef) {
+    dbRecordRef.on('value', (snap) => {
+      const val = snap.val();
+      applyIncomingRecord(val);
+    });
+  }
+
+  if (dbResetRef) {
+    dbResetRef.on('value', (snap) => {
+      const val = snap.val();
+      if (val && val.token && val.token !== lastKnownResetToken) {
+        if (lastKnownResetToken !== 0) {
+          performLocalRecordWipe();
+        }
+        lastKnownResetToken = val.token;
+      }
+    });
+  }
+
+  // 2. REST API 輪詢同步保底 (每 500ms 同步一次，確保 OBS 瀏覽器在任何環境下 100% 即時更新)
+  async function pollFirebaseREST() {
+    // 若控制台剛在 800ms 內寫入過，暫停一次輪詢避免覆蓋正在上傳的狀態；OBS 端則永遠即時讀取
+    if (!isOBSView && Date.now() - lastLocalWriteTime < 800) return;
+
+    try {
+      const res = await fetch(`${FB_BASE_URL}/volleyball_scoreboard.json?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
+      if (res.status === 401 || res.status === 403) {
+        updateStatusBadge('error');
+        return;
+      }
+      if (!res.ok) return;
+
+      updateStatusBadge('online');
+      const data = await res.json();
+
+      // 若整個資料庫為空，且控制台開啟中，自動將目前隊名與配色同步上去
+      if (!data) {
+        if (!isOBSView) saveMeta();
+        if (lastAppliedRecordSyncId !== 'init_record') performLocalRecordWipe();
+        return;
+      }
+
+      if (data.meta) {
+        applyIncomingMeta(data.meta);
+      } else if (!isOBSView) {
+        saveMeta();
+      }
+
+      if (data.resetSignal && data.resetSignal.token && data.resetSignal.token !== lastKnownResetToken) {
+        if (lastKnownResetToken !== 0) {
+          performLocalRecordWipe();
+        }
+        lastKnownResetToken = data.resetSignal.token;
+      }
+
+      if (data.record !== undefined) {
+        applyIncomingRecord(data.record);
+      } else {
+        // data.record 不存在 (代表在 Firebase 中已被刪除) -> 同步歸零比賽紀錄
+        if (lastAppliedRecordSyncId !== 'init_record') {
+          performLocalRecordWipe();
+        }
+      }
+    } catch (e) {}
+  }
+
+  pollFirebaseREST();
+  setInterval(pollFirebaseREST, 500);
+
+  function resetAnimationLocks() {
+    ['t1', 't2'].forEach(k => {
+      if (animTimers[k]) {
+        clearTimeout(animTimers[k]);
+        animTimers[k] = null;
+      }
+      isAnimating[k] = false;
+      const track = document.getElementById(`track-${k}`);
+      if (track) {
+        track.classList.remove('animating-slide');
+        track.style.transform = 'translateY(0)';
+      }
+    });
+  }
+
+  function getTeamSetsWon(teamKey) {
+    const teamObj = recordState[teamKey];
+    const oppObj = recordState[teamKey === 't1' ? 't2' : 't1'];
     let setsWon = 0;
     for (let i = 1; i <= 5; i++) {
-      const score = Number(teamObj[`s${i}`]);
-      const opponentKey = teamObj === state.t1 ? 't2' : 't1';
-      const oppScore = Number(state[opponentKey][`s${i}`]);
-
-      if (!isNaN(score) && !isNaN(oppScore) && teamObj[`s${i}`] !== '' && teamObj[`s${i}`] !== null) {
+      const sVal = teamObj[`s${i}`];
+      const oVal = oppObj[`s${i}`];
+      if (sVal !== '' && sVal !== null && sVal !== undefined && oVal !== '' && oVal !== null && oVal !== undefined) {
+        const score = Number(sVal);
+        const oppScore = Number(oVal);
         const target = i === 5 ? 15 : 25;
         if (score >= target && score - oppScore >= 2) {
           setsWon++;
@@ -1146,29 +1351,29 @@
   window.addEventListener('orientationchange', () => setTimeout(adjustResponsiveScale, 150));
 
   function renderUI(skipTeamKey = null) {
-    const titleText = state.gameTitle || '台灣職業排球聯賽 例行賽';
+    const titleText = metaState.gameTitle || '台灣職業排球聯賽 例行賽';
     document.getElementById('live-title-display').textContent = titleText;
     const sumTitle = document.getElementById('sum-league-title');
     if (sumTitle) sumTitle.textContent = titleText;
 
     const gameTitleInput = document.getElementById('in-game-title');
     if (gameTitleInput && document.activeElement !== gameTitleInput) {
-      gameTitleInput.value = state.gameTitle;
+      gameTitleInput.value = metaState.gameTitle;
     }
 
-    document.getElementById('live-set-title').textContent = `SET ${state.currentSet}`;
-    const t1Sets = getTeamSetsWon(state.t1);
-    const t2Sets = getTeamSetsWon(state.t2);
+    document.getElementById('live-set-title').textContent = `SET ${recordState.currentSet}`;
+    const t1Sets = getTeamSetsWon('t1');
+    const t2Sets = getTeamSetsWon('t2');
     document.getElementById('live-set-score').textContent = `${t1Sets} - ${t2Sets}`;
 
     for (let p = 1; p <= 5; p++) {
       const btn = document.getElementById(`pbtn-${p}`);
-      if (btn) btn.classList.toggle('active', state.currentSet === p);
+      if (btn) btn.classList.toggle('active', recordState.currentSet === p);
     }
 
     // 發球權顯示更新
     ['t1', 't2'].forEach(k => {
-      const isServing = state.servingTeam === k;
+      const isServing = recordState.servingTeam === k;
       const serveTab = document.getElementById(`live-${k}-serve`);
       if (serveTab) serveTab.classList.toggle('active', isServing);
 
@@ -1180,26 +1385,33 @@
     });
 
     // 暫停牌與底欄狀態更新
-    const anyTimeoutShowing = (state.t1.toShowing && state.t1.toCount > 0) || (state.t2.toShowing && state.t2.toCount > 0);
+    const anyTimeoutShowing =
+      (recordState.t1.toShowing && recordState.t1.toCount > 0) ||
+      (recordState.t2.toShowing && recordState.t2.toCount > 0);
     const bottomBar = document.getElementById('live-bottom-bar');
     if (bottomBar) bottomBar.classList.toggle('has-timeout', anyTimeoutShowing);
 
     ['t1', 't2'].forEach(k => {
-      const t = state[k];
-      const curSetScore = (t[`s${state.currentSet}`] !== null && t[`s${state.currentSet}`] !== undefined && t[`s${state.currentSet}`] !== '') ? t[`s${state.currentSet}`] : 0;
+      const m = metaState[k];
+      const r = recordState[k];
+      const curSetScore = (r[`s${recordState.currentSet}`] !== null && r[`s${recordState.currentSet}`] !== undefined && r[`s${recordState.currentSet}`] !== '')
+        ? r[`s${recordState.currentSet}`]
+        : 0;
 
-      document.getElementById(`live-${k}-name`).textContent = t.name;
-      document.getElementById(`live-${k}-bg`).style.background = t.color;
+      // 隊名、代表色與 Logo
+      document.getElementById(`live-${k}-name`).textContent = m.name;
+      document.getElementById(`live-${k}-bg`).style.background = m.color;
 
       const liveLogo = document.getElementById(`live-${k}-logo`);
-      if (t.logo) {
-        liveLogo.src = t.logo;
+      if (m.logo) {
+        liveLogo.src = m.logo;
         liveLogo.style.display = 'block';
       } else {
         liveLogo.style.display = 'none';
       }
 
-      if (skipTeamKey !== k) {
+      // 分數顯示
+      if (skipTeamKey !== k && !isAnimating[k]) {
         const track = document.getElementById(`track-${k}`);
         track.classList.remove('animating-slide');
         track.style.transform = 'translateY(0)';
@@ -1207,52 +1419,53 @@
         document.getElementById(`slot-${k}-next`).textContent = curSetScore;
       }
 
-      // 渲染 1st TIME OUT / 2nd TIME OUT 標籤
+      // 1st TIME OUT / 2nd TIME OUT 標籤
       const toBadge = document.getElementById(`live-${k}-to`);
       if (toBadge) {
-        if (t.toShowing && t.toCount > 0) {
-          const ordSup = t.toCount === 1 ? 'st' : 'nd';
-          toBadge.innerHTML = `${t.toCount}<sup>${ordSup}</sup> TIME OUT`;
+        if (r.toShowing && r.toCount > 0) {
+          const ordSup = r.toCount === 1 ? 'st' : 'nd';
+          toBadge.innerHTML = `${r.toCount}<sup>${ordSup}</sup> TIME OUT`;
           toBadge.classList.add('active');
         } else {
           toBadge.classList.remove('active');
         }
       }
 
-      // 控制台 TO 狀態顯示
+      // 控制台暫停狀態文字
       const toStatus = document.getElementById(`to-status-${k}`);
       if (toStatus) {
-        toStatus.textContent = `${t.toCount || 0} / 2${t.toShowing ? ' (顯示中)' : ''}`;
+        toStatus.textContent = `${r.toCount || 0} / 2${r.toShowing ? ' (顯示中)' : ''}`;
       }
       const toBtn = document.getElementById(`btn-to-${k}`);
       if (toBtn) {
-        toBtn.classList.toggle('active', Boolean(t.toShowing && t.toCount > 0));
+        toBtn.classList.toggle('active', Boolean(r.toShowing && r.toCount > 0));
       }
 
-      // 總計分板 (Summary)
-      document.getElementById(`sum-${k}-name`).textContent = t.name;
-      document.getElementById(`sum-${k}-bg`).style.background = `linear-gradient(90deg, ${t.color}dd 0%, ${t.color} 100%)`;
+      // 局數總計分板 (Summary)
+      document.getElementById(`sum-${k}-name`).textContent = m.name;
+      document.getElementById(`sum-${k}-bg`).style.background = `linear-gradient(90deg, ${m.color}dd 0%, ${m.color} 100%)`;
       const sumLogo = document.getElementById(`sum-${k}-logo`);
-      if (t.logo) {
-        sumLogo.src = t.logo;
+      if (m.logo) {
+        sumLogo.src = m.logo;
         sumLogo.style.display = 'block';
       } else {
         sumLogo.style.display = 'none';
       }
 
       for (let s = 1; s <= 5; s++) {
-        const val = t[`s${s}`];
+        const val = r[`s${s}`];
         const el = document.getElementById(`sum-${k}-s${s}`);
         if (el) el.textContent = (val === null || val === '' || val === undefined) ? '' : val;
       }
-      document.getElementById(`sum-${k}-sets`).textContent = getTeamSetsWon(t);
+      document.getElementById(`sum-${k}-sets`).textContent = getTeamSetsWon(k);
 
+      // 控制台輸入框同步
       const nameInput = document.getElementById(`in-${k}-name`);
-      if (nameInput && document.activeElement !== nameInput) nameInput.value = t.name;
+      if (nameInput && document.activeElement !== nameInput) nameInput.value = m.name;
       const colorInput = document.getElementById(`in-${k}-color`);
-      if (colorInput && document.activeElement !== colorInput) colorInput.value = t.color;
+      if (colorInput && document.activeElement !== colorInput) colorInput.value = m.color;
       const delLogoBtn = document.getElementById(`del-logo-${k}`);
-      if (delLogoBtn) delLogoBtn.style.display = t.logo ? 'inline-block' : 'none';
+      if (delLogoBtn) delLogoBtn.style.display = m.logo ? 'inline-block' : 'none';
     });
 
     adjustResponsiveScale();
@@ -1272,6 +1485,7 @@
     track.classList.remove('animating-slide');
 
     if (delta > 0) {
+      isAnimating[teamKey] = true;
       curSlot.textContent = oldScore;
       plusSlot.textContent = `+${delta}`;
       nextSlot.textContent = newScore;
@@ -1279,11 +1493,13 @@
       track.classList.add('animating-slide');
 
       animTimers[teamKey] = setTimeout(() => {
+        isAnimating[teamKey] = false;
         track.classList.remove('animating-slide');
         track.style.transform = 'translateY(0)';
         curSlot.textContent = newScore;
       }, 1360);
     } else {
+      isAnimating[teamKey] = false;
       curSlot.textContent = newScore;
       nextSlot.textContent = newScore;
     }
@@ -1291,73 +1507,67 @@
 
   // 發球權設定與切換
   function toggleServe(teamKey) {
-    state.servingTeam = (state.servingTeam === teamKey) ? '' : teamKey;
-    state.lastAction = null;
-    saveState(true);
+    recordState.servingTeam = (recordState.servingTeam === teamKey) ? '' : teamKey;
+    recordState.lastAction = null;
     renderUI();
+    saveRecord();
   }
 
   function switchServe() {
-    if (state.servingTeam === 't1') {
-      state.servingTeam = 't2';
-    } else {
-      state.servingTeam = 't1';
-    }
-    state.lastAction = null;
-    saveState(true);
+    recordState.servingTeam = (recordState.servingTeam === 't1') ? 't2' : 't1';
+    recordState.lastAction = null;
     renderUI();
+    saveRecord();
   }
 
   // TO +1 按鍵邏輯：0 -> 1st TIME OUT -> 2nd TIME OUT -> 歸零關閉
   function triggerTimeOut(teamKey) {
-    const t = state[teamKey];
-    const curCount = Number(t.toCount) || 0;
+    const r = recordState[teamKey];
+    const curCount = Number(r.toCount) || 0;
 
     if (curCount === 0) {
-      t.toCount = 1;
-      t.toShowing = true;
+      r.toCount = 1;
+      r.toShowing = true;
     } else if (curCount === 1) {
-      t.toCount = 2;
-      t.toShowing = true;
+      r.toCount = 2;
+      r.toShowing = true;
     } else {
-      // 已達 2 次暫停時：若已隱藏則再次顯示 2nd TIME OUT；若正顯示中則歸零重設本局暫停
-      if (!t.toShowing) {
-        t.toShowing = true;
+      if (!r.toShowing) {
+        r.toShowing = true;
       } else {
-        t.toCount = 0;
-        t.toShowing = false;
+        r.toCount = 0;
+        r.toShowing = false;
       }
     }
 
-    state.lastAction = null;
-    saveState(true);
+    recordState.lastAction = null;
     renderUI();
+    saveRecord();
   }
 
-  // 隱藏畫面上的 TIME OUT 字卡（保留本局已叫暫停次數）
   function hideTimeOut(teamKey) {
-    state[teamKey].toShowing = false;
-    state.lastAction = null;
-    saveState(true);
+    recordState[teamKey].toShowing = false;
+    recordState.lastAction = null;
     renderUI();
+    saveRecord();
   }
 
   function addScore(teamKey, delta) {
-    const sKey = `s${state.currentSet}`;
-    const oldScore = Number(state[teamKey][sKey] || 0);
-    state[teamKey][sKey] = Math.max(0, oldScore + delta);
-    const newScore = Number(state[teamKey][sKey]);
+    const sKey = `s${recordState.currentSet}`;
+    const oldScore = Number(recordState[teamKey][sKey] || 0);
+    recordState[teamKey][sKey] = Math.max(0, oldScore + delta);
+    const newScore = Number(recordState[teamKey][sKey]);
 
-    // 當比賽繼續進行（加分）時，自動收起場上的暫停牌並將發球權交給得分方
+    // 得分時自動收起暫停字卡並將發球權指向得分隊伍
     if (delta > 0) {
-      state.t1.toShowing = false;
-      state.t2.toShowing = false;
-      state.servingTeam = teamKey;
+      recordState.t1.toShowing = false;
+      recordState.t2.toShowing = false;
+      recordState.servingTeam = teamKey;
     }
 
-    const actionId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const actionId = makeSyncId();
     lastProcessedActionId = actionId;
-    state.lastAction = {
+    recordState.lastAction = {
       id: actionId,
       teamKey,
       delta,
@@ -1366,44 +1576,40 @@
       timestamp: Date.now()
     };
 
-    saveState(false);
     renderUI(teamKey);
     playScoreAnimation(teamKey, delta, oldScore, newScore);
-
-    channel.postMessage({ type: 'score_update', state, teamKey, delta, oldScore, newScore });
-    dbRef.set(state).catch((err) => console.error('Firebase 得分更新失敗:', err));
+    saveRecord();
   }
 
   function changeSet(s) {
-    state.currentSet = s;
+    recordState.currentSet = s;
     const sKey = `s${s}`;
-    if (state.t1[sKey] === null || state.t1[sKey] === undefined || state.t1[sKey] === '') state.t1[sKey] = 0;
-    if (state.t2[sKey] === null || state.t2[sKey] === undefined || state.t2[sKey] === '') state.t2[sKey] = 0;
+    if (recordState.t1[sKey] === null || recordState.t1[sKey] === undefined || recordState.t1[sKey] === '') recordState.t1[sKey] = 0;
+    if (recordState.t2[sKey] === null || recordState.t2[sKey] === undefined || recordState.t2[sKey] === '') recordState.t2[sKey] = 0;
 
-    // 換局時自動重設兩隊單局暫停次數與顯示狀態
-    state.t1.toCount = 0;
-    state.t1.toShowing = false;
-    state.t2.toCount = 0;
-    state.t2.toShowing = false;
-    state.lastAction = null;
+    // 換局時自動重設兩隊單局暫停紀錄
+    recordState.t1.toCount = 0;
+    recordState.t1.toShowing = false;
+    recordState.t2.toCount = 0;
+    recordState.t2.toShowing = false;
+    recordState.lastAction = null;
 
-    saveState(true);
     renderUI();
+    saveRecord();
   }
 
+  // 更新賽事名稱、隊名、顏色、Logo (儲存在 meta，歸零重設時絕對保留)
   function updateGameTitle() {
-    state.gameTitle = document.getElementById('in-game-title').value;
-    state.lastAction = null;
-    saveState(true);
+    metaState.gameTitle = document.getElementById('in-game-title').value;
     renderUI();
+    saveMeta();
   }
 
   function updateTeamMeta(teamKey) {
-    state[teamKey].name = document.getElementById(`in-${teamKey}-name`).value;
-    state[teamKey].color = document.getElementById(`in-${teamKey}-color`).value;
-    state.lastAction = null;
-    saveState(true);
+    metaState[teamKey].name = document.getElementById(`in-${teamKey}-name`).value;
+    metaState[teamKey].color = document.getElementById(`in-${teamKey}-color`).value;
     renderUI();
+    saveMeta();
   }
 
   function uploadLogo(teamKey, inputEl) {
@@ -1411,65 +1617,80 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      state[teamKey].logo = e.target.result;
-      state.lastAction = null;
-      saveState(true);
+      metaState[teamKey].logo = e.target.result;
       renderUI();
+      saveMeta();
     };
     reader.readAsDataURL(file);
   }
 
   function removeLogo(teamKey) {
-    state[teamKey].logo = '';
+    metaState[teamKey].logo = '';
     const fileInput = document.getElementById(`file-${teamKey}`);
     if (fileInput) fileInput.value = '';
-    state.lastAction = null;
-    saveState(true);
     renderUI();
+    saveMeta();
   }
 
   // =========================================================
-  // 歸零重設：清除畫面、本機、Firebase 所有資料，並同步重整 OBS
+  // 歸零重設：僅刪除並重置「比賽紀錄 (record)」
+  // 完整保留「球隊名稱、代表色、Logo、賽事名稱 (meta)」並強制同步 OBS
   // =========================================================
   async function resetAllScores() {
-    if (isReloading) return;
+    lastLocalWriteTime = Date.now();
+    const token = Date.now();
+    lastKnownResetToken = token;
 
-    channel.postMessage({ type: 'hard_reset' });
+    // 1. 本機清除比賽紀錄快取並將畫面歸零 (不動 META_STORAGE_KEY)
+    performLocalRecordWipe();
 
-    try {
-      await dbRef.set({ _forceReset: Date.now() });
-      await db.ref().remove();
-    } catch (err) {
-      console.error('Firebase 刪除失敗:', err);
+    // 2. 通知同瀏覽器分頁歸零比賽紀錄
+    channel.postMessage({ type: 'reset_record_only', token });
+
+    // 3. 在 Firebase 刪除 record 節點，並發送 resetSignal 讓所有 OBS 端同步清除紀錄
+    if (dbRecordRef) {
+      dbRecordRef.remove().catch(() => {});
+    }
+    if (dbResetRef) {
+      dbResetRef.set({ token }).catch(() => {});
     }
 
-    wipeLocalAndReload();
+    try {
+      await Promise.all([
+        fetch(`${FB_BASE_URL}/volleyball_scoreboard/record.json`, { method: 'DELETE' }),
+        fetch(`${FB_BASE_URL}/volleyball_scoreboard/resetSignal.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        })
+      ]);
+      updateStatusBadge('online');
+    } catch (e) {
+      console.error('Firebase 紀錄刪除失敗:', e);
+    }
   }
 
+  // 同電腦跨分頁同步
   channel.onmessage = (ev) => {
     if (!ev.data) return;
-    if (ev.data.type === 'hard_reset') {
-      wipeLocalAndReload();
-    } else if (ev.data.type === 'sync') {
-      state = normalizeState(ev.data.state);
-      renderUI();
-    } else if (ev.data.type === 'score_update') {
-      state = normalizeState(ev.data.state);
-      if (state.lastAction && state.lastAction.id) {
-        lastProcessedActionId = state.lastAction.id;
-      }
-      renderUI(ev.data.teamKey);
-      playScoreAnimation(ev.data.teamKey, ev.data.delta, ev.data.oldScore, ev.data.newScore);
+    if (ev.data.type === 'meta_sync') {
+      applyIncomingMeta(ev.data.meta);
+    } else if (ev.data.type === 'record_sync') {
+      applyIncomingRecord(ev.data.record);
+    } else if (ev.data.type === 'reset_record_only') {
+      lastKnownResetToken = ev.data.token || Date.now();
+      performLocalRecordWipe();
     }
   };
 
   window.addEventListener('storage', (ev) => {
-    if (ev.key === STORAGE_KEY) {
+    if (ev.key === META_STORAGE_KEY && ev.newValue) {
+      applyIncomingMeta(JSON.parse(ev.newValue));
+    } else if (ev.key === RECORD_STORAGE_KEY) {
       if (!ev.newValue) {
-        wipeLocalAndReload();
+        performLocalRecordWipe();
       } else {
-        state = normalizeState(JSON.parse(ev.newValue));
-        renderUI();
+        applyIncomingRecord(JSON.parse(ev.newValue));
       }
     }
   });
