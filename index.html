@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>排球轉播計分系統</title>
+<title>排球轉播計分系統 (Firebase 同步版)</title>
+<!-- Firebase SDK (Compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
   * {
     box-sizing: border-box;
@@ -390,6 +393,22 @@
     border-bottom: 1px solid #2a3140;
   }
 
+  .fb-status-badge {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #1e293b;
+    color: #94a3b8;
+    border: 1px solid #334155;
+  }
+
+  .fb-status-badge.online {
+    background: rgba(22, 163, 74, 0.15);
+    color: #4ade80;
+    border-color: #16a34a;
+  }
+
   .period-selector {
     display: flex;
     align-items: center;
@@ -537,9 +556,9 @@
               </div>
               <div class="live-score-box" id="box-t1">
                 <div class="score-track" id="track-t1">
-                  <div class="score-slot" id="slot-t1-cur">18</div>
+                  <div class="score-slot" id="slot-t1-cur">0</div>
                   <div class="score-slot plus-badge" id="slot-t1-plus">+1</div>
-                  <div class="score-slot" id="slot-t1-next">18</div>
+                  <div class="score-slot" id="slot-t1-next">0</div>
                 </div>
               </div>
             </div>
@@ -559,9 +578,9 @@
               </div>
               <div class="live-score-box" id="box-t2">
                 <div class="score-track" id="track-t2">
-                  <div class="score-slot" id="slot-t2-cur">16</div>
+                  <div class="score-slot" id="slot-t2-cur">0</div>
                   <div class="score-slot plus-badge" id="slot-t2-plus">+1</div>
-                  <div class="score-slot" id="slot-t2-next">16</div>
+                  <div class="score-slot" id="slot-t2-next">0</div>
                 </div>
               </div>
             </div>
@@ -600,12 +619,12 @@
               <img id="sum-t1-logo" class="team-logo" src="" alt="" style="display:none;">
               <div class="team-name" id="sum-t1-name">臺中連莊</div>
             </div>
-            <div class="score-q" id="sum-t1-s1">25</div>
-            <div class="score-q" id="sum-t1-s2">25</div>
-            <div class="score-q" id="sum-t1-s3">24</div>
+            <div class="score-q" id="sum-t1-s1">0</div>
+            <div class="score-q" id="sum-t1-s2"></div>
+            <div class="score-q" id="sum-t1-s3"></div>
             <div class="score-q" id="sum-t1-s4"></div>
             <div class="score-q" id="sum-t1-s5"></div>
-            <div class="score-total" id="sum-t1-sets">2</div>
+            <div class="score-total" id="sum-t1-sets">0</div>
           </div>
 
           <div class="row team-row">
@@ -613,12 +632,12 @@
               <img id="sum-t2-logo" class="team-logo" src="" alt="" style="display:none;">
               <div class="team-name" id="sum-t2-name">台鋼天鷹</div>
             </div>
-            <div class="score-q" id="sum-t2-s1">21</div>
-            <div class="score-q" id="sum-t2-s2">17</div>
-            <div class="score-q" id="sum-t2-s3">26</div>
+            <div class="score-q" id="sum-t2-s1">0</div>
+            <div class="score-q" id="sum-t2-s2"></div>
+            <div class="score-q" id="sum-t2-s3"></div>
             <div class="score-q" id="sum-t2-s4"></div>
             <div class="score-q" id="sum-t2-s5"></div>
-            <div class="score-total" id="sum-t2-sets">1</div>
+            <div class="score-total" id="sum-t2-sets">0</div>
           </div>
         </div>
       </div>
@@ -640,7 +659,10 @@
         <button class="period-btn" id="pbtn-4" onclick="changeSet(4)">Set 4</button>
         <button class="period-btn" id="pbtn-5" onclick="changeSet(5)">Set 5</button>
       </div>
-      <button class="ctrl-btn" style="background:#7f1d1d; border-color:#991b1b;" onclick="resetAllScores()">🔄 歸零重設</button>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="fb-status-badge" id="fb-status">連線中...</span>
+        <button class="ctrl-btn" style="background:#7f1d1d; border-color:#991b1b;" onclick="resetAllScores()">🔄 歸零重設</button>
+      </div>
     </div>
 
     <div class="teams-ctrl-grid">
@@ -699,6 +721,7 @@
   </div>
 
 <script>
+  // 防止手機端雙擊縮放
   let lastTouchEnd = 0;
   document.addEventListener('touchend', (e) => {
     const now = Date.now();
@@ -709,6 +732,7 @@
     lastTouchEnd = now;
   }, { passive: false });
 
+  // 視角切換判定
   const params = new URLSearchParams(window.location.search);
   const viewParam = params.get('view');
   if (viewParam === 'volleyball_live') {
@@ -719,34 +743,147 @@
     document.body.classList.add('view-control');
   }
 
+  // =========================================================
+  // Firebase 初始化與設定
+  // =========================================================
+  const STORAGE_KEY = 'volleyball_clean_state_v1';
   const channel = new BroadcastChannel('volleyball_clean_sync_v1');
 
-  const defaultState = {
-    gameTitle: '台灣職業排球聯賽 例行賽',
-    currentSet: 1,
-    t1: { name: '臺中連莊', color: '#0d5c3d', logo: '', s1: 25, s2: 25, s3: 24, s4: '', s5: '' },
-    t2: { name: '台鋼天鷹', color: '#1b4965', logo: '', s1: 21, s2: 17, s3: 26, s4: '', s5: '' }
+  const firebaseConfig = {
+    databaseURL: "https://volleyball-score-0000-default-rtdb.asia-southeast1.firebasedatabase.app/"
   };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const dbRef = db.ref('volleyball_scoreboard');
+
+  // 監測 Firebase 連線狀態
+  db.ref('.info/connected').on('value', (snap) => {
+    const badge = document.getElementById('fb-status');
+    if (!badge) return;
+    if (snap.val() === true) {
+      badge.textContent = '🟢 Firebase 已同步';
+      badge.classList.add('online');
+    } else {
+      badge.textContent = '🔴 離線 (本機模式)';
+      badge.classList.remove('online');
+    }
+  });
+
+  function getDefaultState() {
+    return {
+      gameTitle: '台灣職業排球聯賽 例行賽',
+      currentSet: 1,
+      t1: { name: '臺中連莊', color: '#0d5c3d', logo: '', s1: 0, s2: '', s3: '', s4: '', s5: '' },
+      t2: { name: '台鋼天鷹', color: '#1b4965', logo: '', s1: 0, s2: '', s3: '', s4: '', s5: '' },
+      lastAction: null
+    };
+  }
 
   let state = loadState();
   let animTimers = { t1: null, t2: null };
+  let lastProcessedActionId = null;
+  let hasSyncedDataOnce = false;
+  let isReloading = false;
 
   function loadState() {
     try {
-      const saved = localStorage.getItem('volleyball_clean_state_v1');
-      return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultState));
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return normalizeState(parsed);
+      }
+      return getDefaultState();
     } catch (e) {
-      return JSON.parse(JSON.stringify(defaultState));
+      return getDefaultState();
     }
+  }
+
+  // 確保從 Firebase 取回時不會因為空字串或 null 被吃掉而缺屬性
+  function normalizeState(raw) {
+    const def = getDefaultState();
+    if (!raw || typeof raw !== 'object') return def;
+    const merged = {
+      gameTitle: raw.gameTitle !== undefined ? raw.gameTitle : def.gameTitle,
+      currentSet: Number(raw.currentSet) || 1,
+      t1: Object.assign({}, def.t1, raw.t1 || {}),
+      t2: Object.assign({}, def.t2, raw.t2 || {}),
+      lastAction: raw.lastAction || null,
+      updatedAt: raw.updatedAt || null
+    };
+    return merged;
   }
 
   function saveState(broadcast = true) {
     state.updatedAt = new Date().toISOString();
-    localStorage.setItem('volleyball_clean_state_v1', JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
     if (broadcast) {
       channel.postMessage({ type: 'sync', state });
+      dbRef.set(state).catch((err) => console.error('Firebase 寫入失敗:', err));
     }
   }
+
+  // 強制清除本機快取並重整頁面（供控制台與 OBS 同步觸發）
+  function wipeLocalAndReload() {
+    if (isReloading) return;
+    isReloading = true;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (e) {}
+    state = getDefaultState();
+    renderUI();
+    setTimeout(() => {
+      window.location.reload();
+    }, 120);
+  }
+
+  // 監聽 Firebase 資料變動與遠端刪除重整訊號
+  dbRef.on('value', (snapshot) => {
+    if (isReloading) return;
+    const val = snapshot.val();
+
+    // 情況 1：收到強制重設訊號
+    if (val && val._forceReset) {
+      wipeLocalAndReload();
+      return;
+    }
+
+    // 情況 2：原本有資料，但資料庫節點被刪除 (val === null)
+    if (val === null) {
+      if (hasSyncedDataOnce) {
+        wipeLocalAndReload();
+      } else {
+        // 首次開啟且 Firebase 為空時，維持乾淨歸零狀態
+        localStorage.removeItem(STORAGE_KEY);
+        state = getDefaultState();
+        renderUI();
+      }
+      return;
+    }
+
+    hasSyncedDataOnce = true;
+    state = normalizeState(val);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    // 檢查是否為新的得分動作（跨裝置觸發 OBS 得分動畫）
+    const action = state.lastAction;
+    if (
+      action &&
+      action.id &&
+      action.id !== lastProcessedActionId &&
+      Date.now() - action.timestamp < 5000
+    ) {
+      lastProcessedActionId = action.id;
+      renderUI(action.teamKey);
+      playScoreAnimation(action.teamKey, action.delta, action.oldScore, action.newScore);
+    } else {
+      if (action && action.id) lastProcessedActionId = action.id;
+      renderUI();
+    }
+  });
 
   function getTeamSetsWon(teamObj) {
     let setsWon = 0;
@@ -757,7 +894,7 @@
       
       if (!isNaN(score) && !isNaN(oppScore) && teamObj[`s${i}`] !== '' && teamObj[`s${i}`] !== null) {
         const target = i === 5 ? 15 : 25;
-        if ((score >= target && score - oppScore >= 2)) {
+        if (score >= target && score - oppScore >= 2) {
           setsWon++;
         }
       }
@@ -788,6 +925,11 @@
     document.getElementById('live-title-display').textContent = titleText;
     const sumTitle = document.getElementById('sum-league-title');
     if (sumTitle) sumTitle.textContent = titleText;
+
+    const gameTitleInput = document.getElementById('in-game-title');
+    if (gameTitleInput && document.activeElement !== gameTitleInput) {
+      gameTitleInput.value = state.gameTitle;
+    }
 
     document.getElementById('live-set-title').textContent = `SET ${state.currentSet}`;
     const t1Sets = getTeamSetsWon(state.t1);
@@ -840,9 +982,11 @@
       document.getElementById(`sum-${k}-sets`).textContent = getTeamSetsWon(t);
 
       const nameInput = document.getElementById(`in-${k}-name`);
-      if (document.activeElement !== nameInput) nameInput.value = t.name;
-      document.getElementById(`in-${k}-color`).value = t.color;
-      document.getElementById(`del-logo-${k}`).style.display = t.logo ? 'inline-block' : 'none';
+      if (nameInput && document.activeElement !== nameInput) nameInput.value = t.name;
+      const colorInput = document.getElementById(`in-${k}-color`);
+      if (colorInput && document.activeElement !== colorInput) colorInput.value = t.color;
+      const delLogoBtn = document.getElementById(`del-logo-${k}`);
+      if (delLogoBtn) delLogoBtn.style.display = t.logo ? 'inline-block' : 'none';
     });
 
     adjustResponsiveScale();
@@ -885,10 +1029,23 @@
     state[teamKey][sKey] = Math.max(0, oldScore + delta);
     const newScore = Number(state[teamKey][sKey]);
 
+    const actionId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    lastProcessedActionId = actionId;
+    state.lastAction = {
+      id: actionId,
+      teamKey,
+      delta,
+      oldScore,
+      newScore,
+      timestamp: Date.now()
+    };
+
     saveState(false);
     renderUI(teamKey);
     playScoreAnimation(teamKey, delta, oldScore, newScore);
+
     channel.postMessage({ type: 'score_update', state, teamKey, delta, oldScore, newScore });
+    dbRef.set(state).catch((err) => console.error('Firebase 得分更新失敗:', err));
   }
 
   function changeSet(s) {
@@ -896,12 +1053,14 @@
     const sKey = `s${s}`;
     if (state.t1[sKey] === null || state.t1[sKey] === undefined || state.t1[sKey] === '') state.t1[sKey] = 0;
     if (state.t2[sKey] === null || state.t2[sKey] === undefined || state.t2[sKey] === '') state.t2[sKey] = 0;
+    state.lastAction = null;
     saveState(true);
     renderUI();
   }
 
   function updateGameTitle() {
     state.gameTitle = document.getElementById('in-game-title').value;
+    state.lastAction = null;
     saveState(true);
     renderUI();
   }
@@ -909,6 +1068,7 @@
   function updateTeamMeta(teamKey) {
     state[teamKey].name = document.getElementById(`in-${teamKey}-name`).value;
     state[teamKey].color = document.getElementById(`in-${teamKey}-color`).value;
+    state.lastAction = null;
     saveState(true);
     renderUI();
   }
@@ -919,6 +1079,7 @@
     const reader = new FileReader();
     reader.onload = (e) => {
       state[teamKey].logo = e.target.result;
+      state.lastAction = null;
       saveState(true);
       renderUI();
     };
@@ -927,39 +1088,60 @@
 
   function removeLogo(teamKey) {
     state[teamKey].logo = '';
+    const fileInput = document.getElementById(`file-${teamKey}`);
+    if (fileInput) fileInput.value = '';
+    state.lastAction = null;
     saveState(true);
     renderUI();
   }
 
-  function resetAllScores() {
-    state.currentSet = 1;
-    ['t1', 't2'].forEach(k => {
-      state[k].s1 = 0;
-      state[k].s2 = null;
-      state[k].s3 = null;
-      state[k].s4 = null;
-      state[k].s5 = null;
-    });
-    saveState(true);
-    renderUI();
+  // =========================================================
+  // 歸零重設：清除畫面、本機、Firebase 所有資料，並同步重整 OBS
+  // =========================================================
+  async function resetAllScores() {
+    if (isReloading) return;
+
+    // 1. 通知同瀏覽器分頁立即清除重整
+    channel.postMessage({ type: 'hard_reset' });
+
+    try {
+      // 2. 先發送強制重設訊號給所有遠端 OBS 視窗（確保即使原本資料庫為空也能觸發 OBS 重整）
+      await dbRef.set({ _forceReset: Date.now() });
+      // 3. 徹底刪除 Firebase 根目錄所有資料
+      await db.ref().remove();
+    } catch (err) {
+      console.error('Firebase 刪除失敗:', err);
+    }
+
+    // 4. 清除本機所有儲存資料並重新整理
+    wipeLocalAndReload();
   }
 
   channel.onmessage = (ev) => {
     if (!ev.data) return;
-    if (ev.data.type === 'sync') {
-      state = ev.data.state;
+    if (ev.data.type === 'hard_reset') {
+      wipeLocalAndReload();
+    } else if (ev.data.type === 'sync') {
+      state = normalizeState(ev.data.state);
       renderUI();
     } else if (ev.data.type === 'score_update') {
-      state = ev.data.state;
+      state = normalizeState(ev.data.state);
+      if (state.lastAction && state.lastAction.id) {
+        lastProcessedActionId = state.lastAction.id;
+      }
       renderUI(ev.data.teamKey);
       playScoreAnimation(ev.data.teamKey, ev.data.delta, ev.data.oldScore, ev.data.newScore);
     }
   };
 
   window.addEventListener('storage', (ev) => {
-    if (ev.key === 'volleyball_clean_state_v1' && ev.newValue) {
-      state = JSON.parse(ev.newValue);
-      renderUI();
+    if (ev.key === STORAGE_KEY) {
+      if (!ev.newValue) {
+        wipeLocalAndReload();
+      } else {
+        state = normalizeState(JSON.parse(ev.newValue));
+        renderUI();
+      }
     }
   });
 
