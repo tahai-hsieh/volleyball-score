@@ -92,6 +92,8 @@
     height: 92px;
     background: #11161f;
     width: 100%;
+    position: relative;
+    z-index: 3;
   }
 
   .live-team {
@@ -147,6 +149,7 @@
     min-width: 0;
     position: relative;
     gap: 14px;
+    overflow: hidden;
   }
 
   .live-team.home .live-team-banner {
@@ -173,24 +176,22 @@
     justify-content: center;
     flex: 1;
     min-width: 0;
+    height: 100%;
     overflow: hidden;
   }
 
   .live-name {
-    font-size: 40px;
+    font-size: 48px;
     font-weight: 900;
     letter-spacing: 3px;
     text-shadow: 0 3px 6px rgba(0,0,0,0.75);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     text-align: center;
-    width: 100%;
-    line-height: 1.15;
+    line-height: 1.1;
   }
 
   .live-score-box {
-    width: 118px;
+    width: 122px;
     height: 92px;
     background: #090c12;
     position: relative;
@@ -209,19 +210,19 @@
   }
 
   .score-slot {
-    width: 118px;
+    width: 122px;
     height: 92px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 50px;
+    font-size: 60px;
     font-weight: 900;
     flex-shrink: 0;
   }
 
   .score-slot.plus-badge {
     color: #38bdf8;
-    font-size: 42px;
+    font-size: 48px;
     background: #090c12;
   }
 
@@ -238,7 +239,7 @@
   }
 
   .live-center-period {
-    width: 140px;
+    width: 150px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -251,39 +252,41 @@
   }
 
   .live-center-set-title {
-    font-size: 16px;
+    font-size: 22px;
     font-weight: 900;
-    letter-spacing: 1px;
-    line-height: 1.1;
+    letter-spacing: 1.5px;
+    line-height: 1.05;
   }
 
   .live-center-set-score {
-    font-size: 20px;
+    font-size: 30px;
     font-weight: 900;
     color: #ffffff;
     letter-spacing: 2px;
-    margin-top: 2px;
+    margin-top: 3px;
+    line-height: 1.05;
   }
 
   /* 底部資訊列與暫停牌 (1st / 2nd TIME OUT) */
   .live-bottom-bar {
     background: #090d14;
     color: #ffffff;
-    min-height: 44px;
-    padding: 4px 18px;
+    height: 50px;
+    padding: 2px 18px;
     border-top: 2px solid rgba(255, 255, 255, 0.12);
     display: grid;
-    grid-template-columns: 452px 140px 452px;
+    grid-template-columns: 447px 150px 447px;
     align-items: center;
     justify-content: center;
     width: 100%;
     position: relative;
+    overflow: hidden;
   }
 
   .live-to-slot {
     display: flex;
     align-items: center;
-    min-height: 34px;
+    height: 100%;
     z-index: 2;
   }
 
@@ -301,7 +304,7 @@
     display: none;
     background: linear-gradient(180deg, #991b1b 0%, #7f1d1d 100%);
     color: #ffffff;
-    font-size: 19px;
+    font-size: 20px;
     font-weight: 900;
     letter-spacing: 1.2px;
     padding: 4px 18px;
@@ -331,30 +334,31 @@
 
   .live-title-wrap {
     position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
+    left: 18px;
+    right: 18px;
+    top: 2px;
+    bottom: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     pointer-events: none;
     z-index: 1;
   }
 
   .live-title-text {
-    font-size: 21px;
+    font-size: 27px;
     font-weight: 900;
     letter-spacing: 1.5px;
     text-align: center;
     color: #f8fafc;
-    line-height: 1.25;
+    line-height: 1.15;
     white-space: pre;
     transition: opacity 0.2s ease;
   }
 
   .live-bottom-bar.has-timeout .live-title-text {
-    opacity: 0.22;
+    opacity: 0.2;
   }
 
   /* =========================================================
@@ -378,8 +382,8 @@
   }
 
   .header-row {
-    min-height: 56px;
-    padding: 6px 0;
+    height: 58px;
+    padding: 4px 0;
     background: #0c1017;
     font-weight: 900;
     font-size: 20px;
@@ -389,21 +393,23 @@
 
   .league-title-wrap {
     width: 360px;
-    padding-left: 18px;
-    padding-right: 14px;
+    height: 50px;
+    padding: 0 12px;
     overflow: hidden;
     display: flex;
     align-items: center;
+    justify-content: center;
   }
 
   .league-title {
     font-style: italic;
-    font-size: 22px;
+    font-size: 23px;
     font-weight: 900;
     color: #ffffff;
     letter-spacing: 1px;
-    line-height: 1.25;
+    line-height: 1.18;
     white-space: pre;
+    text-align: center;
   }
 
   .col-q { text-align: center; color: #e0e6ed; }
@@ -427,6 +433,7 @@
     padding: 0 32px 0 16px;
     clip-path: polygon(0 0, 100% 0, 93% 100%, 0% 100%);
     gap: 14px;
+    overflow: hidden;
   }
 
   .team-logo {
@@ -439,16 +446,24 @@
     flex-shrink: 0;
   }
 
+  .team-name-wrap {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
   .team-name {
-    font-size: 34px;
+    font-size: 36px;
     font-weight: 900;
     letter-spacing: 2px;
     text-shadow: 1px 2px 5px rgba(0, 0, 0, 0.65);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex: 1;
     text-align: center;
+    line-height: 1.1;
   }
 
   .score-q {
@@ -731,7 +746,7 @@
               </div>
               <div class="live-team-banner" id="live-t1-bg" style="background: #0d5c3d;">
                 <img id="live-t1-logo" class="live-logo" src="" alt="" style="display:none;">
-                <div class="live-info">
+                <div class="live-info" id="live-t1-info">
                   <div class="live-name" id="live-t1-name">臺中連莊</div>
                 </div>
               </div>
@@ -759,7 +774,7 @@
               </div>
               <div class="live-team-banner" id="live-t2-bg" style="background: #1b4965;">
                 <img id="live-t2-logo" class="live-logo" src="" alt="" style="display:none;">
-                <div class="live-info">
+                <div class="live-info" id="live-t2-info">
                   <div class="live-name" id="live-t2-name">台鋼天鷹</div>
                 </div>
               </div>
@@ -782,7 +797,7 @@
             <div class="live-to-slot away">
               <div class="timeout-badge" id="live-t2-to">1<sup>st</sup> TIME OUT</div>
             </div>
-            <div class="live-title-wrap">
+            <div class="live-title-wrap" id="live-title-wrap">
               <div class="live-title-text" id="live-title-display">台灣職業排球聯賽 例行賽</div>
             </div>
           </div>
@@ -798,7 +813,7 @@
       <div class="scale-inner" id="scale-inner-summary">
         <div class="scoreboard">
           <div class="row header-row">
-            <div class="league-title-wrap">
+            <div class="league-title-wrap" id="sum-league-wrap">
               <div class="league-title" id="sum-league-title">台灣職業排球聯賽 例行賽</div>
             </div>
             <div class="col-q">1<sup>st</sup></div>
@@ -812,7 +827,9 @@
           <div class="row team-row">
             <div class="team-banner" id="sum-t1-bg">
               <img id="sum-t1-logo" class="team-logo" src="" alt="" style="display:none;">
-              <div class="team-name" id="sum-t1-name">臺中連莊</div>
+              <div class="team-name-wrap" id="sum-t1-name-wrap">
+                <div class="team-name" id="sum-t1-name">臺中連莊</div>
+              </div>
             </div>
             <div class="score-q" id="sum-t1-s1">0</div>
             <div class="score-q" id="sum-t1-s2"></div>
@@ -825,7 +842,9 @@
           <div class="row team-row">
             <div class="team-banner" id="sum-t2-bg">
               <img id="sum-t2-logo" class="team-logo" src="" alt="" style="display:none;">
-              <div class="team-name" id="sum-t2-name">台鋼天鷹</div>
+              <div class="team-name-wrap" id="sum-t2-name-wrap">
+                <div class="team-name" id="sum-t2-name">台鋼天鷹</div>
+              </div>
             </div>
             <div class="score-q" id="sum-t2-s1">0</div>
             <div class="score-q" id="sum-t2-s2"></div>
@@ -958,6 +977,58 @@
     document.body.classList.add('view-summary');
   } else {
     document.body.classList.add('view-control');
+  }
+
+  // =========================================================
+  // 自動文字縮放與置中引擎
+  // =========================================================
+  function fitElementToBox(textEl, wrapEl, maxFontPx, minFontPx, lineHeightSingle, lineHeightMulti) {
+    if (!textEl || !wrapEl || wrapEl.offsetParent === null) return;
+    const rawText = textEl.textContent || '';
+    const isMultiLine = rawText.includes('\n');
+
+    textEl.style.lineHeight = isMultiLine ? String(lineHeightMulti) : String(lineHeightSingle);
+
+    const maxW = Math.max(20, wrapEl.clientWidth - 8);
+    const maxH = Math.max(16, wrapEl.clientHeight - 2);
+
+    let size = isMultiLine ? Math.min(maxFontPx, Math.floor(maxH / 2.15)) : maxFontPx;
+    textEl.style.fontSize = `${size}px`;
+
+    while (size > minFontPx && (textEl.scrollWidth > maxW || textEl.scrollHeight > maxH)) {
+      size -= 0.5;
+      textEl.style.fontSize = `${size}px`;
+    }
+  }
+
+  function autoFitAllTexts() {
+    // 1. 場上即時計分板：底欄賽事標題 (單行最大 27px，若有換行或超長自動縮小)
+    fitElementToBox(
+      document.getElementById('live-title-display'),
+      document.getElementById('live-title-wrap'),
+      27, 11, 1.15, 1.12
+    );
+
+    // 2. 局數總計分板：左上角賽事標題 (自動置中，超出 360px 範圍或換行時自動縮小)
+    fitElementToBox(
+      document.getElementById('sum-league-title'),
+      document.getElementById('sum-league-wrap'),
+      23, 11, 1.2, 1.15
+    );
+
+    // 3. 兩隊名稱：場上即時計分板 (最大 48px) & 局數總計分板 (最大 36px)
+    ['t1', 't2'].forEach(k => {
+      fitElementToBox(
+        document.getElementById(`live-${k}-name`),
+        document.getElementById(`live-${k}-info`),
+        48, 18, 1.1, 1.05
+      );
+      fitElementToBox(
+        document.getElementById(`sum-${k}-name`),
+        document.getElementById(`sum-${k}-name-wrap`),
+        36, 16, 1.1, 1.05
+      );
+    });
   }
 
   // =========================================================
@@ -1186,7 +1257,6 @@
 
   // 套用遠端 Record 比賽紀錄
   function applyIncomingRecord(rawRecord) {
-    // 若雲端 record 被刪除 (null)，代表觸發了歸零重設 -> 立刻清除紀錄並歸零畫面
     if (rawRecord === null || rawRecord === undefined) {
       if (lastAppliedRecordSyncId !== 'init_record') {
         performLocalRecordWipe();
@@ -1217,7 +1287,7 @@
     }
   }
 
-  // 1. Firebase SDK 即時監聽 (分成 3 個獨立監聽器，確保刪除 record 時 OBS 立即反應)
+  // 1. Firebase SDK 即時監聽
   if (dbMetaRef) {
     dbMetaRef.on('value', (snap) => {
       const val = snap.val();
@@ -1246,9 +1316,8 @@
     });
   }
 
-  // 2. REST API 輪詢同步保底 (每 500ms 同步一次，確保 OBS 瀏覽器在任何環境下 100% 即時更新)
+  // 2. REST API 輪詢同步保底
   async function pollFirebaseREST() {
-    // 若控制台剛在 800ms 內寫入過，暫停一次輪詢避免覆蓋正在上傳的狀態；OBS 端則永遠即時讀取
     if (!isOBSView && Date.now() - lastLocalWriteTime < 800) return;
 
     try {
@@ -1264,7 +1333,6 @@
       updateStatusBadge('online');
       const data = await res.json();
 
-      // 若整個資料庫為空，且控制台開啟中，自動將目前隊名與配色同步上去
       if (!data) {
         if (!isOBSView) saveMeta();
         if (lastAppliedRecordSyncId !== 'init_record') performLocalRecordWipe();
@@ -1287,7 +1355,6 @@
       if (data.record !== undefined) {
         applyIncomingRecord(data.record);
       } else {
-        // data.record 不存在 (代表在 Firebase 中已被刪除) -> 同步歸零比賽紀錄
         if (lastAppliedRecordSyncId !== 'init_record') {
           performLocalRecordWipe();
         }
@@ -1345,6 +1412,8 @@
       inner.style.transform = `scale(${scale})`;
       outer.style.height = `${Math.ceil(inner.offsetHeight * scale)}px`;
     });
+
+    autoFitAllTexts();
   }
 
   window.addEventListener('resize', adjustResponsiveScale);
